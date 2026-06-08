@@ -10,8 +10,8 @@ function safeEqual(a: string, b: string): boolean {
 
 /** Valida usuario/contraseña contra las variables de entorno. */
 export function verifyCredentials(username: string, password: string): boolean {
-  const expectedUser = process.env.ADMIN_USERNAME ?? "";
-  const expectedPass = process.env.ADMIN_PASSWORD ?? "";
+  const expectedUser = (process.env.ADMIN_USERNAME ?? "").trim();
+  const expectedPass = (process.env.ADMIN_PASSWORD ?? "").trim();
   if (!expectedUser || !expectedPass) return false;
   // Evaluar ambas siempre para no filtrar cuál falló.
   const okUser = safeEqual(username, expectedUser);
