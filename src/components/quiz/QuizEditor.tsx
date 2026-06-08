@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
-import { ImagePicker } from "@/components/media/ImagePicker";
+import { DirectImageUpload } from "@/components/media/DirectImageUpload";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { cn } from "@/lib/cn";
 
@@ -170,7 +170,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                 </Field>
 
                 <Field label="Imagen (opcional)">
-                  <ImagePicker
+                  <DirectImageUpload
                     label={`Imagen pregunta ${index + 1}`}
                     value={question.image_asset_id}
                     valueUrl={question.imageUrl}

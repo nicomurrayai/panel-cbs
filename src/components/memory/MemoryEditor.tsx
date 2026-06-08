@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
-import { ImagePicker } from "@/components/media/ImagePicker";
+import { DirectImageUpload } from "@/components/media/DirectImageUpload";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type CardForm = {
@@ -109,7 +109,7 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
                 key={card.id}
                 className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-cream/30 p-3"
               >
-                <ImagePicker
+                <DirectImageUpload
                   label={`Carta ${index + 1}`}
                   value={card.asset_id}
                   valueUrl={card.assetUrl}
