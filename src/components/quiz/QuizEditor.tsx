@@ -8,7 +8,7 @@ import { quizConfigSchema } from "@/lib/validation/quiz";
 import { saveQuizConfig } from "@/actions/quiz";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input, Textarea } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
 import { DirectImageUpload } from "@/components/media/DirectImageUpload";
@@ -306,14 +306,6 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                     value={question.image_asset_id}
                     valueUrl={question.imageUrl}
                     onChange={(id, url) => updateQuestion(question.id, { image_asset_id: id, imageUrl: url })}
-                  />
-                </Field>
-
-                <Field label="Texto alternativo">
-                  <Input
-                    value={question.image_alt}
-                    onChange={(event) => updateQuestion(question.id, { image_alt: event.target.value })}
-                    placeholder="Describe la imagen para el totem"
                   />
                 </Field>
 
