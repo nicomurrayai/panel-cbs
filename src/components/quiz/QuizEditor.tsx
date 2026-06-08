@@ -160,7 +160,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                   </div>
                 </div>
 
-                <Field label="Enunciado" required={question.active}>
+                <Field label="Pregunta" required={question.active}>
                   <Textarea
                     value={question.question}
                     onChange={(event) => updateQuestion(question.id, { question: event.target.value })}
