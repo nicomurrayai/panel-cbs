@@ -169,6 +169,54 @@ export type Database = {
           },
         ]
       }
+      match_pairs: {
+        Row: {
+          active: boolean
+          created_at: string
+          game_id: string
+          id: string
+          image_asset_id: string | null
+          sort_order: number
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          game_id: string
+          id?: string
+          image_asset_id?: string | null
+          sort_order?: number
+          text?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          game_id?: string
+          id?: string
+          image_asset_id?: string | null
+          sort_order?: number
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_pairs_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_pairs_image_asset_id_fkey"
+            columns: ["image_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_assets: {
         Row: {
           active: boolean

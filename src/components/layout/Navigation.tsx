@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Brain,
   HelpCircle,
+  Link2,
   type LucideIcon,
 } from "lucide-react";
 import { BrandMark } from "@/components/BrandMark";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/cn";
 export const NAV_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/quiz", label: "Quiz", icon: HelpCircle },
+  { href: "/match", label: "Relacionar", icon: Link2 },
 ];
 
 export function isActive(pathname: string, href: string): boolean {

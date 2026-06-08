@@ -6,6 +6,7 @@ export const GAME_META: Record<
   memory: { label: "Memory Card", configHref: "/memory" },
   roulette: { label: "Ruleta", configHref: "/ruleta" },
   quiz: { label: "Quiz", configHref: "/quiz" },
+  match: { label: "Relacionar", configHref: "/match" },
 };
 
 export function gameLabel(id: string): string {
