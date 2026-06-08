@@ -22,6 +22,14 @@ export const quizConfigSchema = z
           path: ["questions", index, "question"],
         });
       }
+
+      if (question.active && !question.image_asset_id) {
+        ctx.addIssue({
+          code: "custom",
+          message: `La pregunta #${index + 1} activa necesita una imagen.`,
+          path: ["questions", index, "image_asset_id"],
+        });
+      }
     });
   });
 

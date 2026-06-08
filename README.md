@@ -86,17 +86,15 @@ descripción y la **imagen de portada**.
   nombre, o no hay ningún segmento habilitado.
 
 ### Memory Card
-- Definí **filas × columnas** (la cantidad de cartas debe ser **par**), el
-  **tiempo límite**, los **intentos máximos** y la **dificultad**.
-- Cada **carta** es un par, con su imagen/etiqueta y color.
-- No se puede activar el nivel si no hay **suficientes pares** o si una carta
-  activa no tiene imagen ni etiqueta.
+- Definí el **tiempo límite** (10–600 segundos) y las **cartas** del juego.
+- Cada carta es un par: subí una imagen desde el panel. El juego duplica cada
+  carta automáticamente para formar los pares.
+- No se puede guardar una carta activa sin imagen.
 
 ### Quiz
 - Preguntas **Verdadero / Falso**: escribí la afirmación, elegí la respuesta
-  correcta y, si querés, una imagen de referencia.
-- Opcionalmente agrupá las preguntas en **categorías**.
-- No se puede activar una pregunta sin enunciado.
+  correcta y subí una imagen de referencia.
+- No se puede activar una pregunta sin enunciado ni sin imagen.
 
 ### Ajustes globales
 Textos de la pantalla principal, nombres de marca e imagen de fondo, y la
@@ -133,5 +131,6 @@ src/
   `postgres_changes` con la publishable/anon key pública. Si un formulario tiene
   cambios sin guardar, los cambios externos quedan pendientes para aplicar sin
   pisar la edición local.
-- **Sin migraciones:** el panel usa el esquema existente de Supabase. Los
-  "intentos máximos" de Memory se guardan en `memory_levels.config`.
+- **Tablas compartidas con panel-juegos:** `quiz_questions`, `memory_settings`,
+  `memory_card_faces`, `media_assets` y `games`. Los juegos leen solo filas
+  activas; el panel gestiona todo el contenido real sin datos demo.
