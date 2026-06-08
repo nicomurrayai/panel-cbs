@@ -8,23 +8,20 @@ export const dynamic = "force-dynamic";
 export default async function MemoryPage() {
   let config: Awaited<ReturnType<typeof getMemoryConfig>> | null = null;
   let error: string | null = null;
+
   try {
     config = await getMemoryConfig();
-  } catch (e) {
-    error = e instanceof Error ? e.message : "Error desconocido";
+  } catch (cause) {
+    error = cause instanceof Error ? cause.message : "Error desconocido";
   }
 
   return (
     <>
       <PageIntro
         title="Memory Card"
-        description="Configurá cartas, pares, dificultad, tiempo e intentos. No se puede activar un set incompleto."
+        description="Configura el tiempo maximo y la galeria de imagenes que el totem duplica para formar pares."
       />
-      {error || !config ? (
-        <SetupNotice error={error ?? "Sin datos"} />
-      ) : (
-        <MemoryEditor config={config} />
-      )}
+      {error || !config ? <SetupNotice error={error ?? "Sin datos"} /> : <MemoryEditor config={config} />}
     </>
   );
 }

@@ -2,23 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Plus,
-  Trash2,
-  Save,
-  AlertTriangle,
-  CheckCircle2,
-  Check,
-  X,
-} from "lucide-react";
+import { Plus, Trash2, Save, AlertTriangle, CheckCircle2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import type { QuizConfigView } from "@/lib/data/quiz";
 import { quizConfigSchema } from "@/lib/validation/quiz";
-import { DIFFICULTIES, DIFFICULTY_LABEL } from "@/lib/validation/memory";
 import { saveQuizConfig } from "@/actions/quiz";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input, Textarea, Select } from "@/components/ui/Input";
+import { Input, Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
 import { ImagePicker } from "@/components/media/ImagePicker";
@@ -31,8 +22,6 @@ type QuestionForm = {
   image_asset_id: string | null;
   imageUrl: string | null;
   image_alt: string;
-  difficulty: string;
-  time_limit_seconds: string;
   correct: boolean;
   active: boolean;
 };
@@ -40,49 +29,31 @@ type QuestionForm = {
 export function QuizEditor({ config }: { config: QuizConfigView }) {
   const router = useRouter();
   const { run, isPending } = useAsyncAction();
-
-  const [settings, setSettings] = useState({ ...config.settings });
   const [questions, setQuestions] = useState<QuestionForm[]>(
-    config.questions.map((q) => ({
-      id: q.id,
-      question: q.question,
-      image_asset_id: q.image_asset_id,
-      imageUrl: q.imageUrl,
-      image_alt: q.image_alt,
-      difficulty: q.difficulty,
-      time_limit_seconds:
-        q.time_limit_seconds != null ? String(q.time_limit_seconds) : "",
-      correct: q.correct,
-      active: q.active,
+    config.questions.map((question) => ({
+      id: question.id,
+      question: question.question,
+      image_asset_id: question.image_asset_id,
+      imageUrl: question.imageUrl,
+      image_alt: question.image_alt,
+      correct: question.correct,
+      active: question.active,
     })),
   );
 
-  function setS(field: keyof typeof settings, value: string | number) {
-    setSettings((prev) => ({ ...prev, [field]: value }));
-  }
   function updateQuestion(id: string, patch: Partial<QuestionForm>) {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, ...patch } : q)));
+    setQuestions((current) => current.map((question) => (question.id === id ? { ...question, ...patch } : question)));
   }
+
   function buildInput() {
     return {
-      settings: {
-        ...settings,
-        feedback_delay_ms: Number(settings.feedback_delay_ms) || 0,
-        next_delay_ms: Number(settings.next_delay_ms) || 0,
-      },
-      categories: [],
-      questions: questions.map((q) => ({
-        id: q.id,
-        question: q.question,
-        image_asset_id: q.image_asset_id,
-        image_alt: q.image_alt,
-        difficulty: q.difficulty,
-        time_limit_seconds: q.time_limit_seconds.trim()
-          ? Number(q.time_limit_seconds) || 0
-          : null,
-        category_id: null,
-        correct: q.correct,
-        active: q.active,
+      questions: questions.map((question) => ({
+        id: question.id,
+        question: question.question,
+        image_asset_id: question.image_asset_id,
+        image_alt: question.image_alt,
+        correct: question.correct,
+        active: question.active,
       })),
     };
   }
@@ -90,15 +61,16 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
   const validation = useMemo(
     () => quizConfigSchema.safeParse(buildInput()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings, questions],
+    [questions],
   );
 
   function save() {
     const parsed = quizConfigSchema.safeParse(buildInput());
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Configuración inválida.");
+      toast.error(parsed.error.issues[0]?.message ?? "Configuracion invalida.");
       return;
     }
+
     run(() => saveQuizConfig(parsed.data), {
       success: "Quiz guardado",
       onSuccess: () => router.refresh(),
@@ -113,45 +85,38 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
             {validation.success ? (
               <>
                 <CheckCircle2 size={18} className="text-success" />
-                <span className="text-ink">Configuración válida</span>
+                <span className="text-ink">Configuracion valida</span>
               </>
             ) : (
               <>
                 <AlertTriangle size={18} className="text-danger" />
-                <span className="text-danger">
-                  {validation.error.issues[0]?.message}
-                </span>
+                <span className="text-danger">{validation.error.issues[0]?.message}</span>
               </>
             )}
           </div>
           <div className="text-sm text-muted">
-            {questions.filter((q) => q.active).length} preguntas activas de{" "}
-            {questions.length}
+            {questions.filter((question) => question.active).length} preguntas activas de {questions.length}
           </div>
         </CardBody>
       </Card>
 
-      {/* Preguntas */}
       <Card>
         <CardHeader
-          title="Preguntas (Verdadero / Falso)"
-          description="Cada pregunta tiene una afirmación, imagen opcional y la respuesta correcta."
+          title="Preguntas"
+          description="Cada pregunta incluye enunciado, imagen opcional y una respuesta Verdadero/Falso."
           actions={
             <Button
               variant="secondary"
               size="sm"
               onClick={() =>
-                setQuestions((p) => [
-                  ...p,
+                setQuestions((current) => [
+                  ...current,
                   {
                     id: crypto.randomUUID(),
                     question: "",
                     image_asset_id: null,
                     imageUrl: null,
                     image_alt: "",
-                    difficulty: "normal",
-                    time_limit_seconds: "",
-                    category_id: null,
                     correct: true,
                     active: true,
                   },
@@ -163,35 +128,30 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
           }
         />
         <CardBody>
-          {questions.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted">
-              No hay preguntas. Agregá la primera.
-            </p>
-          )}
+          {questions.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No hay preguntas. Agrega la primera.</p>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {questions.map((q, index) => (
+            {questions.map((question, index) => (
               <div
-                key={q.id}
+                key={question.id}
                 className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-cream/30 p-4"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-muted">
-                    #{index + 1}
-                  </span>
+                  <span className="text-sm font-bold text-muted">#{index + 1}</span>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                       Activa
                       <Toggle
-                        checked={q.active}
-                        onChange={(v) => updateQuestion(q.id, { active: v })}
+                        checked={question.active}
+                        onChange={(value) => updateQuestion(question.id, { active: value })}
                         label="Activa"
                       />
                     </label>
                     <button
                       type="button"
-                      onClick={() =>
-                        setQuestions((p) => p.filter((x) => x.id !== q.id))
-                      }
+                      onClick={() => setQuestions((current) => current.filter((item) => item.id !== question.id))}
                       className="rounded-lg p-1.5 text-danger hover:bg-danger/10"
                       aria-label="Eliminar pregunta"
                     >
@@ -200,44 +160,46 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                   </div>
                 </div>
 
-                <Field label="Enunciado" required={q.active}>
+                <Field label="Enunciado" required={question.active}>
                   <Textarea
-                    value={q.question}
-                    onChange={(e) =>
-                      updateQuestion(q.id, { question: e.target.value })
-                    }
+                    value={question.question}
+                    onChange={(event) => updateQuestion(question.id, { question: event.target.value })}
                     rows={2}
-                    placeholder="Escribí la afirmación a evaluar…"
+                    placeholder="Escribe la afirmacion a evaluar..."
                   />
                 </Field>
 
                 <Field label="Imagen (opcional)">
                   <ImagePicker
-                    label={`Imagen · pregunta ${index + 1}`}
-                    value={q.image_asset_id}
-                    valueUrl={q.imageUrl}
-                    onChange={(id, url) =>
-                      updateQuestion(q.id, { image_asset_id: id, imageUrl: url })
-                    }
+                    label={`Imagen pregunta ${index + 1}`}
+                    value={question.image_asset_id}
+                    valueUrl={question.imageUrl}
+                    onChange={(id, url) => updateQuestion(question.id, { image_asset_id: id, imageUrl: url })}
+                  />
+                </Field>
+
+                <Field label="Texto alternativo">
+                  <Input
+                    value={question.image_alt}
+                    onChange={(event) => updateQuestion(question.id, { image_alt: event.target.value })}
+                    placeholder="Describe la imagen para el totem"
                   />
                 </Field>
 
                 <Field label="Respuesta correcta">
                   <div className="flex gap-2">
-                    {(
-                      [
-                        { v: true, label: "Verdadero", icon: Check },
-                        { v: false, label: "Falso", icon: X },
-                      ] as const
-                    ).map(({ v, label, icon: Icon }) => (
+                    {([
+                      { value: true, label: "Verdadero", icon: Check },
+                      { value: false, label: "Falso", icon: X },
+                    ] as const).map(({ value, label, icon: Icon }) => (
                       <button
                         key={label}
                         type="button"
-                        onClick={() => updateQuestion(q.id, { correct: v })}
+                        onClick={() => updateQuestion(question.id, { correct: value })}
                         className={cn(
                           "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition",
-                          q.correct === v
-                            ? v
+                          question.correct === value
+                            ? value
                               ? "border-success bg-success/12 text-success"
                               : "border-danger bg-danger/12 text-danger"
                             : "border-panel-border bg-white text-muted hover:bg-cream-strong",
@@ -248,32 +210,6 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                     ))}
                   </div>
                 </Field>
-
-                <Field label="Dificultad">
-                  <Select
-                    value={q.difficulty}
-                    onChange={(e) =>
-                      updateQuestion(q.id, { difficulty: e.target.value })
-                    }
-                  >
-                    {DIFFICULTIES.map((d) => (
-                      <option key={d} value={d}>
-                        {DIFFICULTY_LABEL[d]}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-
-                <Field label="Tiempo (seg)" hint="Vacío = sin límite">
-                  <Input
-                    type="number"
-                    min={0}
-                    value={q.time_limit_seconds}
-                    onChange={(e) =>
-                      updateQuestion(q.id, { time_limit_seconds: e.target.value })
-                    }
-                  />
-                </Field>
               </div>
             ))}
           </div>
@@ -281,13 +217,8 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
       </Card>
 
       <div className="sticky bottom-4 flex justify-end">
-        <Button
-          onClick={save}
-          loading={isPending}
-          disabled={!validation.success}
-          className="shadow-soft"
-        >
-          <Save size={16} /> Guardar configuración
+        <Button onClick={save} loading={isPending} disabled={!validation.success} className="shadow-soft">
+          <Save size={16} /> Guardar configuracion
         </Button>
       </div>
     </div>

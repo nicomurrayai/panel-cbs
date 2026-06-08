@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Disc3,
   Brain,
   HelpCircle,
   type LucideIcon,

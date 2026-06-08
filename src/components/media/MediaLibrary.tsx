@@ -18,7 +18,6 @@ import {
 import { readImageDimensions } from "@/lib/imageClient";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { MediaAssetView } from "@/types/panel";
 

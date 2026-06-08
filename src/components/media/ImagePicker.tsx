@@ -63,7 +63,6 @@ export function ImagePicker({
   useEffect(() => {
     if (!open) return;
     let active = true;
-    setLoading(true);
     listImageAssets()
       .then((res) => {
         if (!active) return;
@@ -115,7 +114,10 @@ export function ImagePicker({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setLoading(true);
+            setOpen(true);
+          }}
         >
           <ImagePlus size={15} />
           {valueUrl ? "Cambiar" : "Elegir imagen"}

@@ -14,203 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      app_config: {
-        Row: {
-          config: Json
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          config: Json
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          config?: Json
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      game_events: {
-        Row: {
-          created_at: string
-          device_id: string
-          event_type: string
-          game_id: string
-          id: string
-          payload: Json
-          session_id: string | null
-          session_key: string
-        }
-        Insert: {
-          created_at?: string
-          device_id: string
-          event_type: string
-          game_id: string
-          id?: string
-          payload?: Json
-          session_id?: string | null
-          session_key: string
-        }
-        Update: {
-          created_at?: string
-          device_id?: string
-          event_type?: string
-          game_id?: string
-          id?: string
-          payload?: Json
-          session_id?: string | null
-          session_key?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "game_events_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "game_events_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "game_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      game_rewards: {
-        Row: {
-          active: boolean
-          asset_id: string | null
-          config: Json
-          created_at: string
-          ends_at: string | null
-          game_id: string
-          id: string
-          max_awards: number | null
-          name: string
-          reward_type: string
-          sort_order: number
-          starts_at: string | null
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          asset_id?: string | null
-          config?: Json
-          created_at?: string
-          ends_at?: string | null
-          game_id: string
-          id?: string
-          max_awards?: number | null
-          name: string
-          reward_type?: string
-          sort_order?: number
-          starts_at?: string | null
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          asset_id?: string | null
-          config?: Json
-          created_at?: string
-          ends_at?: string | null
-          game_id?: string
-          id?: string
-          max_awards?: number | null
-          name?: string
-          reward_type?: string
-          sort_order?: number
-          starts_at?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "game_rewards_asset_id_fkey"
-            columns: ["asset_id"]
-            isOneToOne: false
-            referencedRelation: "media_assets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "game_rewards_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      game_sessions: {
-        Row: {
-          created_at: string
-          device_id: string
-          finished_at: string | null
-          game_id: string
-          id: string
-          max_score: number | null
-          metadata: Json
-          outcome: string | null
-          score: number | null
-          session_key: string
-          source: string
-          started_at: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          device_id: string
-          finished_at?: string | null
-          game_id: string
-          id?: string
-          max_score?: number | null
-          metadata?: Json
-          outcome?: string | null
-          score?: number | null
-          session_key: string
-          source?: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          device_id?: string
-          finished_at?: string | null
-          game_id?: string
-          id?: string
-          max_score?: number | null
-          metadata?: Json
-          outcome?: string | null
-          score?: number | null
-          session_key?: string
-          source?: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "game_sessions_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       games: {
         Row: {
           accent_color: string | null
@@ -425,44 +228,29 @@ export type Database = {
       }
       memory_card_faces: {
         Row: {
-          accent_color: string
           active: boolean
-          asset_id: string | null
-          asset_label: string
+          asset_id: string
           created_at: string
+          game_id: string
           id: string
-          label: string
-          level_id: string
-          metadata: Json
-          pair_key: string
           sort_order: number
           updated_at: string
         }
         Insert: {
-          accent_color?: string
           active?: boolean
-          asset_id?: string | null
-          asset_label?: string
+          asset_id: string
           created_at?: string
+          game_id: string
           id?: string
-          label: string
-          level_id: string
-          metadata?: Json
-          pair_key: string
           sort_order?: number
           updated_at?: string
         }
         Update: {
-          accent_color?: string
           active?: boolean
-          asset_id?: string | null
-          asset_label?: string
+          asset_id?: string
           created_at?: string
+          game_id?: string
           id?: string
-          label?: string
-          level_id?: string
-          metadata?: Json
-          pair_key?: string
           sort_order?: number
           updated_at?: string
         }
@@ -475,155 +263,29 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "memory_card_faces_level_id_fkey"
-            columns: ["level_id"]
-            isOneToOne: false
-            referencedRelation: "memory_levels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      memory_levels: {
-        Row: {
-          active: boolean
-          columns: number
-          config: Json
-          created_at: string
-          difficulty: string
-          game_id: string
-          id: string
-          instruction_text: string | null
-          instruction_title: string | null
-          key: string
-          name: string
-          reveal_delay_ms: number
-          reward_id: string | null
-          rows: number
-          sort_order: number
-          time_limit_seconds: number
-          timeout_text: string | null
-          timeout_title: string | null
-          updated_at: string
-          victory_text: string | null
-          victory_title: string | null
-        }
-        Insert: {
-          active?: boolean
-          columns?: number
-          config?: Json
-          created_at?: string
-          difficulty?: string
-          game_id: string
-          id?: string
-          instruction_text?: string | null
-          instruction_title?: string | null
-          key: string
-          name: string
-          reveal_delay_ms?: number
-          reward_id?: string | null
-          rows?: number
-          sort_order?: number
-          time_limit_seconds?: number
-          timeout_text?: string | null
-          timeout_title?: string | null
-          updated_at?: string
-          victory_text?: string | null
-          victory_title?: string | null
-        }
-        Update: {
-          active?: boolean
-          columns?: number
-          config?: Json
-          created_at?: string
-          difficulty?: string
-          game_id?: string
-          id?: string
-          instruction_text?: string | null
-          instruction_title?: string | null
-          key?: string
-          name?: string
-          reveal_delay_ms?: number
-          reward_id?: string | null
-          rows?: number
-          sort_order?: number
-          time_limit_seconds?: number
-          timeout_text?: string | null
-          timeout_title?: string | null
-          updated_at?: string
-          victory_text?: string | null
-          victory_title?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "memory_levels_game_id_fkey"
+            foreignKeyName: "memory_card_faces_game_id_fkey"
             columns: ["game_id"]
             isOneToOne: false
             referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "memory_levels_reward_id_fkey"
-            columns: ["reward_id"]
-            isOneToOne: false
-            referencedRelation: "game_rewards"
             referencedColumns: ["id"]
           },
         ]
       }
       memory_settings: {
         Row: {
-          animation_config: Json
-          card_faces: Json
-          columns: number
-          difficulty: string
           game_id: string
-          instruction_text: string
-          instruction_title: string
-          reveal_delay_ms: number
-          rows: number
-          sound_config: Json
           time_limit_seconds: number
-          timeout_text: string
-          timeout_title: string
           updated_at: string
-          victory_text: string
-          victory_title: string
         }
         Insert: {
-          animation_config?: Json
-          card_faces?: Json
-          columns?: number
-          difficulty?: string
           game_id: string
-          instruction_text?: string
-          instruction_title?: string
-          reveal_delay_ms?: number
-          rows?: number
-          sound_config?: Json
           time_limit_seconds?: number
-          timeout_text?: string
-          timeout_title?: string
           updated_at?: string
-          victory_text?: string
-          victory_title?: string
         }
         Update: {
-          animation_config?: Json
-          card_faces?: Json
-          columns?: number
-          difficulty?: string
           game_id?: string
-          instruction_text?: string
-          instruction_title?: string
-          reveal_delay_ms?: number
-          rows?: number
-          sound_config?: Json
           time_limit_seconds?: number
-          timeout_text?: string
-          timeout_title?: string
           updated_at?: string
-          victory_text?: string
-          victory_title?: string
         }
         Relationships: [
           {
@@ -664,163 +326,44 @@ export type Database = {
           },
         ]
       }
-      quiz_answers: {
-        Row: {
-          active: boolean
-          answer_value: string
-          created_at: string
-          id: string
-          is_correct: boolean
-          label: string
-          metadata: Json
-          question_id: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          answer_value: string
-          created_at?: string
-          id?: string
-          is_correct?: boolean
-          label: string
-          metadata?: Json
-          question_id: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          answer_value?: string
-          created_at?: string
-          id?: string
-          is_correct?: boolean
-          label?: string
-          metadata?: Json
-          question_id?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_answers_question_id_fkey"
-            columns: ["question_id"]
-            isOneToOne: false
-            referencedRelation: "quiz_questions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quiz_categories: {
-        Row: {
-          active: boolean
-          config: Json
-          created_at: string
-          description: string
-          game_id: string
-          id: string
-          name: string
-          slug: string
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          config?: Json
-          created_at?: string
-          description?: string
-          game_id: string
-          id?: string
-          name: string
-          slug: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          config?: Json
-          created_at?: string
-          description?: string
-          game_id?: string
-          id?: string
-          name?: string
-          slug?: string
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_categories_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       quiz_questions: {
         Row: {
           active: boolean
-          category_id: string | null
+          correct_answer: boolean
           created_at: string
-          difficulty: string
-          feedback_correct: string | null
-          feedback_incorrect: string | null
           game_id: string
           id: string
           image_alt: string
           image_asset_id: string | null
-          metadata: Json
-          points: number
           question: string
           sort_order: number
-          time_limit_seconds: number | null
           updated_at: string
         }
         Insert: {
           active?: boolean
-          category_id?: string | null
+          correct_answer?: boolean
           created_at?: string
-          difficulty?: string
-          feedback_correct?: string | null
-          feedback_incorrect?: string | null
           game_id: string
           id?: string
           image_alt?: string
           image_asset_id?: string | null
-          metadata?: Json
-          points?: number
           question: string
           sort_order?: number
-          time_limit_seconds?: number | null
           updated_at?: string
         }
         Update: {
           active?: boolean
-          category_id?: string | null
+          correct_answer?: boolean
           created_at?: string
-          difficulty?: string
-          feedback_correct?: string | null
-          feedback_incorrect?: string | null
           game_id?: string
           id?: string
           image_alt?: string
           image_asset_id?: string | null
-          metadata?: Json
-          points?: number
           question?: string
           sort_order?: number
-          time_limit_seconds?: number | null
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "quiz_questions_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "quiz_categories"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "quiz_questions_game_id_fkey"
             columns: ["game_id"]
@@ -833,152 +376,6 @@ export type Database = {
             columns: ["image_asset_id"]
             isOneToOne: false
             referencedRelation: "media_assets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quiz_result_rules: {
-        Row: {
-          active: boolean
-          config: Json
-          created_at: string
-          game_id: string
-          id: string
-          max_percentage: number | null
-          max_score: number | null
-          min_percentage: number | null
-          min_score: number | null
-          reward_id: string | null
-          sort_order: number
-          text: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          config?: Json
-          created_at?: string
-          game_id: string
-          id?: string
-          max_percentage?: number | null
-          max_score?: number | null
-          min_percentage?: number | null
-          min_score?: number | null
-          reward_id?: string | null
-          sort_order?: number
-          text?: string
-          title?: string
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          config?: Json
-          created_at?: string
-          game_id?: string
-          id?: string
-          max_percentage?: number | null
-          max_score?: number | null
-          min_percentage?: number | null
-          min_score?: number | null
-          reward_id?: string | null
-          sort_order?: number
-          text?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_result_rules_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: false
-            referencedRelation: "games"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quiz_result_rules_reward_id_fkey"
-            columns: ["reward_id"]
-            isOneToOne: false
-            referencedRelation: "game_rewards"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      quiz_settings: {
-        Row: {
-          animation_config: Json
-          correct_feedback: string
-          correct_label: string
-          default_time_per_question_seconds: number | null
-          empty_text: string
-          empty_title: string
-          feedback_delay_ms: number
-          final_text: string
-          final_title: string
-          game_id: string
-          incorrect_feedback: string
-          incorrect_label: string
-          instruction_title: string
-          loading_text: string
-          next_delay_ms: number
-          next_question_text: string
-          pass_score: number | null
-          randomize_answers: boolean
-          randomize_questions: boolean
-          sound_config: Json
-          updated_at: string
-        }
-        Insert: {
-          animation_config?: Json
-          correct_feedback?: string
-          correct_label?: string
-          default_time_per_question_seconds?: number | null
-          empty_text?: string
-          empty_title?: string
-          feedback_delay_ms?: number
-          final_text?: string
-          final_title?: string
-          game_id: string
-          incorrect_feedback?: string
-          incorrect_label?: string
-          instruction_title?: string
-          loading_text?: string
-          next_delay_ms?: number
-          next_question_text?: string
-          pass_score?: number | null
-          randomize_answers?: boolean
-          randomize_questions?: boolean
-          sound_config?: Json
-          updated_at?: string
-        }
-        Update: {
-          animation_config?: Json
-          correct_feedback?: string
-          correct_label?: string
-          default_time_per_question_seconds?: number | null
-          empty_text?: string
-          empty_title?: string
-          feedback_delay_ms?: number
-          final_text?: string
-          final_title?: string
-          game_id?: string
-          incorrect_feedback?: string
-          incorrect_label?: string
-          instruction_title?: string
-          loading_text?: string
-          next_delay_ms?: number
-          next_question_text?: string
-          pass_score?: number | null
-          randomize_answers?: boolean
-          randomize_questions?: boolean
-          sound_config?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_settings_game_id_fkey"
-            columns: ["game_id"]
-            isOneToOne: true
-            referencedRelation: "games"
             referencedColumns: ["id"]
           },
         ]

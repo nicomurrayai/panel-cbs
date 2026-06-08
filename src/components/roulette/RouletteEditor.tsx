@@ -73,7 +73,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   const router = useRouter();
   const { run, isPending } = useAsyncAction();
 
-  const [settings, setSettings] = useState({
+  const settings = {
     instruction_title: config.settings.instruction_title,
     instruction_text: config.settings.instruction_text,
     spin_label: config.settings.spin_label,
@@ -83,7 +83,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
     offline_text: config.settings.offline_text,
     duration_ms: String(config.settings.duration_ms),
     min_turns: String(config.settings.min_turns),
-  });
+  };
   const [segments, setSegments] = useState<SegForm[]>(
     config.segments.map(toForm),
   );
@@ -95,10 +95,6 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         .reduce((acc, s) => acc + (Number(s.probability_weight) || 0), 0),
     [segments],
   );
-
-  function setS(field: keyof typeof settings, value: string) {
-    setSettings((prev) => ({ ...prev, [field]: value }));
-  }
 
   function updateSegment(id: string, patch: Partial<SegForm>) {
     setSegments((prev) =>
@@ -171,7 +167,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   const validation = useMemo(
     () => rouletteConfigSchema.safeParse(buildInput()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings, segments],
+    [segments],
   );
 
   function save() {
