@@ -32,6 +32,7 @@ cp .env.example .env.local
 | `SUPABASE_URL` | URL del proyecto | Supabase → Project Settings → API → Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clave con acceso total (**solo servidor**) | Supabase → Project Settings → API → `service_role` |
 | `NEXT_PUBLIC_SUPABASE_URL` | Igual a `SUPABASE_URL` (para armar URLs de imágenes) | — |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Clave pública para Supabase Realtime en el navegador | Supabase → Project Settings → API → publishable/anon key |
 | `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET` | Bucket de imágenes (`game-assets`) | — |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Usuario y contraseña del panel | Lo elegís vos |
 | `SESSION_SECRET` | Secreto para firmar la sesión (≥32 caracteres) | Generalo (ver abajo) |
@@ -128,5 +129,9 @@ src/
 - **Seguridad:** la `service_role` solo se usa en `lib/supabase/admin.ts`
   (marcado `server-only`). Las mutaciones pasan por *Server Actions* y se validan
   con Zod **en el servidor** además del navegador.
+- **Realtime:** los formularios se hidratan con SSR y luego escuchan
+  `postgres_changes` con la publishable/anon key pública. Si un formulario tiene
+  cambios sin guardar, los cambios externos quedan pendientes para aplicar sin
+  pisar la edición local.
 - **Sin migraciones:** el panel usa el esquema existente de Supabase. Los
   "intentos máximos" de Memory se guardan en `memory_levels.config`.

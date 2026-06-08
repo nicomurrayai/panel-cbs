@@ -1,55 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Loader2, Radio, RadioTower, WifiOff } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useSupabaseRealtime, type RealtimeStatus } from "@/hooks/useSupabaseRealtime";
 
-type State = "checking" | "ok" | "down";
+const statusConfig: Record<
+  RealtimeStatus,
+  { icon: typeof Radio; text: string; cls: string; spin?: boolean }
+> = {
+  disabled: { icon: WifiOff, text: "Realtime sin configurar", cls: "text-danger" },
+  connecting: { icon: Loader2, text: "Conectando Realtime...", cls: "text-muted", spin: true },
+  connected: { icon: RadioTower, text: "Realtime activo", cls: "text-success" },
+  disconnected: { icon: WifiOff, text: "Reconectando Realtime", cls: "text-danger" },
+};
 
 export function ConnectionStatus() {
-  const [state, setState] = useState<State>("checking");
-  const [latency, setLatency] = useState<number | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    async function check() {
-      try {
-        const res = await fetch("/api/health", { cache: "no-store" });
-        const data = (await res.json()) as { ok: boolean; latencyMs?: number };
-        if (!active) return;
-        setState(data.ok ? "ok" : "down");
-        setLatency(data.latencyMs ?? null);
-      } catch {
-        if (active) setState("down");
-      }
-    }
-    check();
-    const id = setInterval(check, 30_000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  const config = {
-    checking: { icon: Loader2, text: "Verificando…", cls: "text-muted", spin: true },
-    ok: {
-      icon: Wifi,
-      text: latency != null ? `Conectado · ${latency} ms` : "Conectado",
-      cls: "text-success",
-      spin: false,
-    },
-    down: { icon: WifiOff, text: "Sin conexión", cls: "text-danger", spin: false },
-  }[state];
-
+  const status = useSupabaseRealtime({
+    channelName: "panel-cbs-connection",
+    tables: ["global_settings"],
+  });
+  const config = statusConfig[status];
   const Icon = config.icon;
+
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold",
         config.cls,
       )}
-      title="Estado de conexión con Supabase"
+      title="Estado de Supabase Realtime"
     >
       <Icon size={14} className={config.spin ? "animate-spin" : undefined} />
       {config.text}

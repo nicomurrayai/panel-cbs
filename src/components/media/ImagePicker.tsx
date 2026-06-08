@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Trash2, Upload, Check, ImageOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, ImageOff, ImagePlus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { listImageAssets, uploadImageAsset } from "@/actions/media";
-import {
-  IMAGE_ACCEPT,
-  validateImageFile,
-  humanFileSize,
-  IMAGE_MAX_BYTES,
-} from "@/lib/validation/media";
+import { uploadImageAsset } from "@/actions/media";
+import { IMAGE_ACCEPT, IMAGE_MAX_BYTES, humanFileSize, validateImageFile } from "@/lib/validation/media";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { readImageDimensions } from "@/lib/imageClient";
 import { cn } from "@/lib/cn";
 import type { MediaAssetView } from "@/types/panel";
+import { useSupabaseRealtime, type RealtimePayload } from "@/hooks/useSupabaseRealtime";
+import {
+  fetchImageAssetRows,
+  isVisibleImageAsset,
+  mediaAssetToView,
+  type MediaAssetRow,
+} from "@/lib/realtime/mediaAssets";
 
 export function Thumb({
   url,
@@ -60,16 +62,54 @@ export function ImagePicker({
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const applyAssetPayload = useCallback((payload: RealtimePayload<MediaAssetRow>) => {
+    const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as Partial<MediaAssetRow>;
+    const id = row.id;
+    if (!id) {
+      return;
+    }
+
+    setAssets((current) => {
+      if (payload.eventType === "DELETE" || !isVisibleImageAsset(row)) {
+        return current.filter((asset) => asset.id !== id);
+      }
+
+      const nextAsset = mediaAssetToView(payload.new as MediaAssetRow);
+      return [nextAsset, ...current.filter((asset) => asset.id !== id)];
+    });
+  }, []);
+
+  useSupabaseRealtime({
+    channelName: "panel-cbs-image-picker",
+    tables: ["media_assets"],
+    enabled: open,
+    onChange: (_table, payload) => applyAssetPayload(payload as RealtimePayload<MediaAssetRow>),
+    onReconnect: async () => {
+      const rows = await fetchImageAssetRows();
+      setAssets(rows.map(mediaAssetToView));
+    },
+  });
+
   useEffect(() => {
     if (!open) return;
     let active = true;
-    listImageAssets()
-      .then((res) => {
-        if (!active) return;
-        if (res.ok) setAssets(res.data ?? []);
-        else toast.error(res.error);
+    fetchImageAssetRows()
+      .then((rows) => {
+        if (active) {
+          setAssets(rows.map(mediaAssetToView));
+        }
       })
-      .finally(() => active && setLoading(false));
+      .catch((cause) => {
+        if (active) {
+          toast.error(cause instanceof Error ? cause.message : "No se pudo leer la biblioteca.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
     return () => {
       active = false;
     };
@@ -82,6 +122,7 @@ export function ImagePicker({
       toast.error(err);
       return;
     }
+
     const form = new FormData();
     form.set("file", file);
     form.set("alt", file.name);
@@ -89,12 +130,13 @@ export function ImagePicker({
       form.set("width", String(dims.width));
       form.set("height", String(dims.height));
     }
+
     setUploading(true);
     try {
       const res = await uploadImageAsset(form);
       if (res.ok && res.data) {
         toast.success("Imagen subida");
-        setAssets((prev) => [res.data!, ...prev]);
+        setAssets((prev) => [res.data!, ...prev.filter((asset) => asset.id !== res.data!.id)]);
         onChange(res.data.id, res.data.url);
         setOpen(false);
       } else if (!res.ok) {
@@ -140,9 +182,9 @@ export function ImagePicker({
             type="file"
             accept={IMAGE_ACCEPT}
             className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void handleFile(f);
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handleFile(file);
             }}
           />
           <button
@@ -152,53 +194,39 @@ export function ImagePicker({
             className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-panel-border bg-cream/40 px-4 py-6 text-sm text-muted transition hover:border-orange hover:bg-cream-strong disabled:opacity-60"
           >
             {uploading ? <Spinner /> : <Upload size={22} className="text-orange-deep" />}
-            <span className="font-semibold text-ink">
-              {uploading ? "Subiendo…" : "Subir nueva imagen"}
-            </span>
-            <span className="text-xs">
-              PNG, JPG, WEBP o SVG · máx {humanFileSize(IMAGE_MAX_BYTES)}
-            </span>
+            <span className="font-semibold text-ink">{uploading ? "Subiendo..." : "Subir nueva imagen"}</span>
+            <span className="text-xs">PNG, JPG, WEBP o SVG - max {humanFileSize(IMAGE_MAX_BYTES)}</span>
           </button>
 
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">
-              Biblioteca
-            </p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Biblioteca</p>
             {loading ? (
               <div className="grid place-items-center py-8 text-muted">
                 <Spinner />
               </div>
             ) : assets.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted">
-                Todavía no hay imágenes. Subí la primera arriba.
-              </p>
+              <p className="py-6 text-center text-sm text-muted">Todavia no hay imagenes. Subi la primera arriba.</p>
             ) : (
               <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
-                {assets.map((a) => {
-                  const selected = a.id === value;
+                {assets.map((asset) => {
+                  const selected = asset.id === value;
                   return (
                     <button
-                      key={a.id}
+                      key={asset.id}
                       type="button"
                       onClick={() => {
-                        onChange(a.id, a.url);
+                        onChange(asset.id, asset.url);
                         setOpen(false);
                       }}
                       className={cn(
                         "group relative aspect-square overflow-hidden rounded-xl border bg-cream transition",
-                        selected
-                          ? "border-orange ring-2 ring-orange/40"
-                          : "border-panel-border hover:border-orange",
+                        selected ? "border-orange ring-2 ring-orange/40" : "border-panel-border hover:border-orange",
                       )}
-                      title={a.alt || a.key}
+                      title={asset.alt || asset.key}
                     >
-                      {a.url ? (
+                      {asset.url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={a.url}
-                          alt={a.alt}
-                          className="h-full w-full object-contain"
-                        />
+                        <img src={asset.url} alt={asset.alt} className="h-full w-full object-contain" />
                       ) : (
                         <ImageOff size={18} className="m-auto text-muted/60" />
                       )}

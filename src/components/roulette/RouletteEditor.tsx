@@ -1,26 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Save,
-  AlertTriangle,
-  CheckCircle2,
-} from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import type {
-  RouletteConfigView,
-  RouletteSegmentView,
-} from "@/lib/data/roulette";
-import {
-  PRIZE_TYPES,
-  PRIZE_TYPE_LABEL,
-  rouletteConfigSchema,
-} from "@/lib/validation/roulette";
+import type { RouletteConfigView, RouletteSegmentView } from "@/lib/data/roulette";
+import { PRIZE_TYPES, PRIZE_TYPE_LABEL, rouletteConfigSchema } from "@/lib/validation/roulette";
 import { saveRouletteConfig } from "@/actions/roulette";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -31,7 +15,30 @@ import { Badge } from "@/components/ui/Badge";
 import { Advanced } from "@/components/ui/Advanced";
 import { ColorField } from "@/components/forms/ColorField";
 import { ImagePicker } from "@/components/media/ImagePicker";
+import { PendingRemoteChange } from "@/components/realtime/PendingRemoteChange";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useSupabaseRealtime, type RealtimePayload } from "@/hooks/useSupabaseRealtime";
+import { getBrowserClient } from "@/lib/supabase/browser";
+import { assetUrl } from "@/lib/supabase/publicStorage";
+import { sameJson } from "@/lib/realtime/compare";
+import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
+import type { Database } from "@/types/database.types";
+
+type RouletteSettingsRow = Database["public"]["Tables"]["roulette_settings"]["Row"];
+type RouletteSegmentRow = Database["public"]["Tables"]["roulette_segments"]["Row"];
+type RouletteInventoryRow = Database["public"]["Tables"]["roulette_prize_inventory"]["Row"];
+
+type SettingsForm = {
+  instruction_title: string;
+  instruction_text: string;
+  spin_label: string;
+  winner_title: string;
+  thanks_title: string;
+  offline_title: string;
+  offline_text: string;
+  duration_ms: string;
+  min_turns: string;
+};
 
 type SegForm = {
   id: string;
@@ -41,6 +48,7 @@ type SegForm = {
   color: string;
   text_color: string;
   enabled: boolean;
+  sort_order: number;
   asset_id: string | null;
   assetUrl: string | null;
   result_title: string;
@@ -50,30 +58,25 @@ type SegForm = {
   remaining_stock: number | null;
 };
 
-function toForm(s: RouletteSegmentView): SegForm {
+type RouletteForm = {
+  settings: SettingsForm;
+  segments: SegForm[];
+};
+
+const DEFAULT_SETTINGS: SettingsForm = {
+  instruction_title: "",
+  instruction_text: "",
+  spin_label: "Girar",
+  winner_title: "",
+  thanks_title: "",
+  offline_title: "",
+  offline_text: "",
+  duration_ms: "3800",
+  min_turns: "5",
+};
+
+function settingsFromView(config: RouletteConfigView): SettingsForm {
   return {
-    id: s.id,
-    label: s.label,
-    prize_type: s.prize_type,
-    probability_weight: String(s.probability_weight),
-    color: s.color,
-    text_color: s.text_color,
-    enabled: s.enabled,
-    asset_id: s.asset_id,
-    assetUrl: s.assetUrl,
-    result_title: s.result_title ?? "",
-    result_text: s.result_text ?? "",
-    stock_managed: s.stock_managed,
-    total_stock: s.total_stock != null ? String(s.total_stock) : "",
-    remaining_stock: s.remaining_stock,
-  };
-}
-
-export function RouletteEditor({ config }: { config: RouletteConfigView }) {
-  const router = useRouter();
-  const { run, isPending } = useAsyncAction();
-
-  const settings = {
     instruction_title: config.settings.instruction_title,
     instruction_text: config.settings.instruction_text,
     spin_label: config.settings.spin_label,
@@ -84,22 +87,254 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
     duration_ms: String(config.settings.duration_ms),
     min_turns: String(config.settings.min_turns),
   };
-  const [segments, setSegments] = useState<SegForm[]>(
-    config.segments.map(toForm),
+}
+
+function settingsFromRow(row: RouletteSettingsRow | null): SettingsForm {
+  if (!row) {
+    return DEFAULT_SETTINGS;
+  }
+
+  return {
+    instruction_title: row.instruction_title,
+    instruction_text: row.instruction_text,
+    spin_label: row.spin_label,
+    winner_title: row.winner_title,
+    thanks_title: row.thanks_title,
+    offline_title: row.offline_title,
+    offline_text: row.offline_text,
+    duration_ms: String(row.duration_ms),
+    min_turns: String(row.min_turns),
+  };
+}
+
+function sortSegments(segments: SegForm[]) {
+  return [...segments].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+}
+
+function toForm(segment: RouletteSegmentView): SegForm {
+  return {
+    id: segment.id,
+    label: segment.label,
+    prize_type: segment.prize_type,
+    probability_weight: String(segment.probability_weight),
+    color: segment.color,
+    text_color: segment.text_color,
+    enabled: segment.enabled,
+    sort_order: segment.sort_order,
+    asset_id: segment.asset_id,
+    assetUrl: segment.assetUrl,
+    result_title: segment.result_title ?? "",
+    result_text: segment.result_text ?? "",
+    stock_managed: segment.stock_managed,
+    total_stock: segment.total_stock != null ? String(segment.total_stock) : "",
+    remaining_stock: segment.remaining_stock,
+  };
+}
+
+async function segmentFromRow(row: RouletteSegmentRow, inventory?: RouletteInventoryRow | null): Promise<SegForm> {
+  const asset = await fetchMediaAssetById(row.asset_id);
+  return {
+    id: row.id,
+    label: row.label,
+    prize_type: row.prize_type as SegForm["prize_type"],
+    probability_weight: String(row.probability_weight),
+    color: row.color,
+    text_color: row.text_color,
+    enabled: row.enabled,
+    sort_order: row.sort_order,
+    asset_id: row.asset_id,
+    assetUrl: assetUrl(asset),
+    result_title: row.result_title ?? "",
+    result_text: row.result_text ?? "",
+    stock_managed: row.stock_managed,
+    total_stock: inventory?.total_stock != null ? String(inventory.total_stock) : "",
+    remaining_stock: inventory?.remaining_stock ?? null,
+  };
+}
+
+async function fetchRouletteForm(): Promise<RouletteForm | null> {
+  const supabase = getBrowserClient();
+  if (!supabase) {
+    return null;
+  }
+
+  const [settingsRes, segmentsRes, inventoryRes] = await Promise.all([
+    supabase.from("roulette_settings").select("*").eq("game_id", "roulette").maybeSingle(),
+    supabase.from("roulette_segments").select("*").eq("game_id", "roulette").order("sort_order", { ascending: true }),
+    supabase.from("roulette_prize_inventory").select("*"),
+  ]);
+
+  if (settingsRes.error) throw settingsRes.error;
+  if (segmentsRes.error) throw segmentsRes.error;
+  if (inventoryRes.error) throw inventoryRes.error;
+
+  const inventoryBySegment = new Map((inventoryRes.data ?? []).map((row) => [row.segment_id, row as RouletteInventoryRow]));
+  const segments = await Promise.all(
+    ((segmentsRes.data ?? []) as RouletteSegmentRow[]).map((row) => segmentFromRow(row, inventoryBySegment.get(row.id))),
   );
+
+  return {
+    settings: settingsFromRow((settingsRes.data as RouletteSettingsRow | null) ?? null),
+    segments: sortSegments(segments),
+  };
+}
+
+function formFromConfig(config: RouletteConfigView): RouletteForm {
+  return {
+    settings: settingsFromView(config),
+    segments: config.segments.map(toForm),
+  };
+}
+
+export function RouletteEditor({ config }: { config: RouletteConfigView }) {
+  const { run, isPending } = useAsyncAction();
+  const initialForm = useMemo(() => formFromConfig(config), [config]);
+  const [settings, setSettings] = useState(initialForm.settings);
+  const [segments, setSegments] = useState<SegForm[]>(initialForm.segments);
+  const [baseline, setBaseline] = useState(initialForm);
+  const [pendingRemote, setPendingRemote] = useState<RouletteForm | null>(null);
+
+  const currentForm = useMemo<RouletteForm>(() => ({ settings, segments }), [segments, settings]);
+  const isDirty = !sameJson(currentForm, baseline);
+
+  const applyForm = useCallback((form: RouletteForm) => {
+    setSettings(form.settings);
+    setSegments(sortSegments(form.segments).map((segment) => ({ ...segment })));
+    setBaseline(form);
+    setPendingRemote(null);
+  }, []);
+
+  const queueRemoteSnapshot = useCallback(async () => {
+    const form = await fetchRouletteForm();
+    if (form) {
+      setPendingRemote(form);
+      toast.info("Hay cambios externos en Ruleta.");
+    }
+  }, []);
+
+  const handleRemoteForm = useCallback(
+    (form: RouletteForm) => {
+      if (isDirty) {
+        setPendingRemote(form);
+        toast.info("Hay cambios externos en Ruleta.");
+        return;
+      }
+
+      applyForm(form);
+    },
+    [applyForm, isDirty],
+  );
+
+  useSupabaseRealtime({
+    channelName: "panel-cbs-roulette",
+    tables: ["roulette_settings", "roulette_segments", "roulette_prize_inventory", "media_assets"],
+    onChange: (table, payload) => {
+      if (isDirty) {
+        void queueRemoteSnapshot();
+        return;
+      }
+
+      if (table === "roulette_settings") {
+        const row = (payload as RealtimePayload<RouletteSettingsRow>).new;
+        if (payload.eventType !== "DELETE" && row.game_id === "roulette") {
+          applyForm({ ...currentForm, settings: settingsFromRow(row as RouletteSettingsRow) });
+        }
+        return;
+      }
+
+      if (table === "roulette_segments") {
+        const segmentPayload = payload as RealtimePayload<RouletteSegmentRow>;
+        const row = (segmentPayload.eventType === "DELETE" ? segmentPayload.old : segmentPayload.new) as Partial<RouletteSegmentRow>;
+        if (row.game_id && row.game_id !== "roulette") {
+          return;
+        }
+
+        if (segmentPayload.eventType === "DELETE") {
+          applyForm({ ...currentForm, segments: currentForm.segments.filter((segment) => segment.id !== row.id) });
+          return;
+        }
+
+        const inventory = currentForm.segments.find((segment) => segment.id === row.id);
+        void segmentFromRow(segmentPayload.new as RouletteSegmentRow, inventory
+          ? {
+              segment_id: inventory.id,
+              total_stock: Number(inventory.total_stock) || 0,
+              remaining_stock: inventory.remaining_stock ?? 0,
+              awarded_count: 0,
+              reserved_stock: 0,
+              updated_at: "",
+            }
+          : null,
+        ).then((nextSegment) => {
+          applyForm({
+            ...currentForm,
+            segments: sortSegments([
+              nextSegment,
+              ...currentForm.segments.filter((segment) => segment.id !== nextSegment.id),
+            ]),
+          });
+        });
+        return;
+      }
+
+      if (table === "roulette_prize_inventory") {
+        const inventoryPayload = payload as RealtimePayload<RouletteInventoryRow>;
+        const row = (inventoryPayload.eventType === "DELETE" ? inventoryPayload.old : inventoryPayload.new) as Partial<RouletteInventoryRow>;
+        if (!row.segment_id) {
+          return;
+        }
+
+        const nextSegments = currentForm.segments.map((segment) => {
+          if (segment.id !== row.segment_id) {
+            return segment;
+          }
+
+          if (inventoryPayload.eventType === "DELETE") {
+            return { ...segment, total_stock: "", remaining_stock: null };
+          }
+
+          const nextInventory = inventoryPayload.new as RouletteInventoryRow;
+          return {
+            ...segment,
+            total_stock: String(nextInventory.total_stock),
+            remaining_stock: nextInventory.remaining_stock,
+          };
+        });
+        applyForm({ ...currentForm, segments: nextSegments });
+        return;
+      }
+
+      const mediaPayload = payload as RealtimePayload<MediaAssetRow>;
+      const row = (mediaPayload.eventType === "DELETE" ? mediaPayload.old : mediaPayload.new) as Partial<MediaAssetRow>;
+      if (!row.id) {
+        return;
+      }
+
+      const nextSegments = currentForm.segments.map((segment) =>
+        segment.asset_id === row.id
+          ? { ...segment, assetUrl: mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow) }
+          : segment,
+      );
+      applyForm({ ...currentForm, segments: nextSegments });
+    },
+    onReconnect: async () => {
+      const form = await fetchRouletteForm();
+      if (form) {
+        handleRemoteForm(form);
+      }
+    },
+  });
 
   const totalWeight = useMemo(
     () =>
       segments
-        .filter((s) => s.enabled)
-        .reduce((acc, s) => acc + (Number(s.probability_weight) || 0), 0),
+        .filter((segment) => segment.enabled)
+        .reduce((acc, segment) => acc + (Number(segment.probability_weight) || 0), 0),
     [segments],
   );
 
   function updateSegment(id: string, patch: Partial<SegForm>) {
-    setSegments((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-    );
+    setSegments((prev) => prev.map((segment) => (segment.id === id ? { ...segment, ...patch } : segment)));
   }
 
   function addSegment() {
@@ -113,6 +348,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         color: "#ffd100",
         text_color: "#17171d",
         enabled: true,
+        sort_order: prev.length,
         asset_id: null,
         assetUrl: null,
         result_title: "",
@@ -125,7 +361,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   }
 
   function removeSegment(id: string) {
-    setSegments((prev) => prev.filter((s) => s.id !== id));
+    setSegments((prev) => prev.filter((segment) => segment.id !== id));
   }
 
   function move(index: number, dir: -1 | 1) {
@@ -134,7 +370,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
       const target = index + dir;
       if (target < 0 || target >= next.length) return prev;
       [next[index], next[target]] = [next[target], next[index]];
-      return next;
+      return next.map((segment, nextIndex) => ({ ...segment, sort_order: nextIndex }));
     });
   }
 
@@ -145,21 +381,22 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         duration_ms: Number(settings.duration_ms) || 0,
         min_turns: Number(settings.min_turns) || 0,
       },
-      segments: segments.map((s) => ({
-        id: s.id,
-        label: s.label,
-        prize_type: s.prize_type,
-        probability_weight: Number(s.probability_weight) || 0,
-        color: s.color,
-        text_color: s.text_color,
-        enabled: s.enabled,
-        asset_id: s.asset_id,
-        result_title: s.result_title.trim() ? s.result_title : null,
-        result_text: s.result_text.trim() ? s.result_text : null,
-        stock_managed: s.stock_managed,
-        total_stock: s.stock_managed
-          ? Number(s.total_stock) || (s.total_stock === "" ? null : 0)
+      segments: segments.map((segment, index) => ({
+        id: segment.id,
+        label: segment.label,
+        prize_type: segment.prize_type,
+        probability_weight: Number(segment.probability_weight) || 0,
+        color: segment.color,
+        text_color: segment.text_color,
+        enabled: segment.enabled,
+        asset_id: segment.asset_id,
+        result_title: segment.result_title.trim() ? segment.result_title : null,
+        result_text: segment.result_text.trim() ? segment.result_text : null,
+        stock_managed: segment.stock_managed,
+        total_stock: segment.stock_managed
+          ? Number(segment.total_stock) || (segment.total_stock === "" ? null : 0)
           : null,
+        sort_order: index,
       })),
     };
   }
@@ -167,54 +404,52 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   const validation = useMemo(
     () => rouletteConfigSchema.safeParse(buildInput()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [segments],
+    [segments, settings],
   );
 
   function save() {
-    const input = buildInput();
-    const parsed = rouletteConfigSchema.safeParse(input);
+    const parsed = rouletteConfigSchema.safeParse(buildInput());
     if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Configuración inválida.");
+      toast.error(parsed.error.issues[0]?.message ?? "Configuracion invalida.");
       return;
     }
+
     run(() => saveRouletteConfig(parsed.data), {
       success: "Ruleta guardada",
-      onSuccess: () => router.refresh(),
+      onSuccess: () => {
+        setBaseline(currentForm);
+        setPendingRemote(null);
+      },
     });
   }
 
   return (
     <div className="space-y-5">
-      {/* Estado de validación */}
-      <Card
-        className={
-          validation.success ? "border-success/40" : "border-danger/40"
-        }
-      >
+      {pendingRemote ? (
+        <PendingRemoteChange onApply={() => applyForm(pendingRemote)} onDismiss={() => setPendingRemote(null)} />
+      ) : null}
+
+      <Card className={validation.success ? "border-success/40" : "border-danger/40"}>
         <CardBody className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold">
             {validation.success ? (
               <>
                 <CheckCircle2 size={18} className="text-success" />
-                <span className="text-ink">Configuración válida</span>
+                <span className="text-ink">Configuracion valida</span>
               </>
             ) : (
               <>
                 <AlertTriangle size={18} className="text-danger" />
-                <span className="text-danger">
-                  {validation.error.issues[0]?.message}
-                </span>
+                <span className="text-danger">{validation.error.issues[0]?.message}</span>
               </>
             )}
           </div>
           <div className="text-sm text-muted">
-            Peso total (habilitados):{" "}
-            <span className="font-bold text-ink">{totalWeight}</span>
+            Peso total (habilitados): <span className="font-bold text-ink">{totalWeight}</span>
           </div>
         </CardBody>
       </Card>
 
-      {/* Segmentos */}
       <Card>
         <CardHeader
           title="Segmentos y premios"
@@ -226,45 +461,27 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
           }
         />
         <CardBody className="space-y-4">
-          {segments.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted">
-              No hay segmentos. Agregá el primero.
-            </p>
-          )}
-          {segments.map((seg, index) => {
-            const weight = Number(seg.probability_weight) || 0;
-            const pct =
-              seg.enabled && totalWeight > 0
-                ? ((weight / totalWeight) * 100).toFixed(1)
-                : "0.0";
+          {segments.length === 0 ? <p className="py-6 text-center text-sm text-muted">No hay segmentos. Agrega el primero.</p> : null}
+          {segments.map((segment, index) => {
+            const weight = Number(segment.probability_weight) || 0;
+            const pct = segment.enabled && totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(1) : "0.0";
             return (
-              <div
-                key={seg.id}
-                className="rounded-2xl border border-panel-border bg-cream/30 p-4"
-              >
+              <div key={segment.id} className="rounded-2xl border border-panel-border bg-cream/30 p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span
                     className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold"
-                    style={{ background: seg.color, color: seg.text_color }}
+                    style={{ background: segment.color, color: segment.text_color }}
                   >
                     {index + 1}
                   </span>
                   <Input
-                    value={seg.label}
+                    value={segment.label}
                     placeholder="Nombre del premio"
-                    onChange={(e) =>
-                      updateSegment(seg.id, { label: e.target.value })
-                    }
+                    onChange={(event) => updateSegment(segment.id, { label: event.target.value })}
                     className="min-w-40 flex-1"
                   />
-                  <Badge tone={seg.enabled ? "success" : "neutral"}>
-                    {pct}%
-                  </Badge>
-                  <Toggle
-                    checked={seg.enabled}
-                    onChange={(v) => updateSegment(seg.id, { enabled: v })}
-                    label="Habilitado"
-                  />
+                  <Badge tone={segment.enabled ? "success" : "neutral"}>{pct}%</Badge>
+                  <Toggle checked={segment.enabled} onChange={(value) => updateSegment(segment.id, { enabled: value })} label="Habilitado" />
                   <div className="flex items-center">
                     <button
                       type="button"
@@ -286,7 +503,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => removeSegment(seg.id)}
+                      onClick={() => removeSegment(segment.id)}
                       className="rounded-lg p-1.5 text-danger hover:bg-danger/10"
                       aria-label="Eliminar"
                     >
@@ -298,16 +515,12 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label="Tipo">
                     <Select
-                      value={seg.prize_type}
-                      onChange={(e) =>
-                        updateSegment(seg.id, {
-                          prize_type: e.target.value as SegForm["prize_type"],
-                        })
-                      }
+                      value={segment.prize_type}
+                      onChange={(event) => updateSegment(segment.id, { prize_type: event.target.value as SegForm["prize_type"] })}
                     >
-                      {PRIZE_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {PRIZE_TYPE_LABEL[t]}
+                      {PRIZE_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {PRIZE_TYPE_LABEL[type]}
                         </option>
                       ))}
                     </Select>
@@ -316,55 +529,33 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                     <Input
                       type="number"
                       min={0}
-                      value={seg.probability_weight}
-                      onChange={(e) =>
-                        updateSegment(seg.id, {
-                          probability_weight: e.target.value,
-                        })
-                      }
+                      value={segment.probability_weight}
+                      onChange={(event) => updateSegment(segment.id, { probability_weight: event.target.value })}
                     />
                   </Field>
                   <Field label="Color">
-                    <ColorField
-                      value={seg.color}
-                      onChange={(v) => updateSegment(seg.id, { color: v })}
-                    />
+                    <ColorField value={segment.color} onChange={(value) => updateSegment(segment.id, { color: value })} />
                   </Field>
                   <Field label="Color del texto">
-                    <ColorField
-                      value={seg.text_color}
-                      onChange={(v) => updateSegment(seg.id, { text_color: v })}
-                    />
+                    <ColorField value={segment.text_color} onChange={(value) => updateSegment(segment.id, { text_color: value })} />
                   </Field>
                 </div>
 
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <Field label="Imagen del premio">
                     <ImagePicker
-                      label={`Imagen · ${seg.label || "segmento"}`}
-                      value={seg.asset_id}
-                      valueUrl={seg.assetUrl}
-                      onChange={(id, url) =>
-                        updateSegment(seg.id, { asset_id: id, assetUrl: url })
-                      }
+                      label={`Imagen - ${segment.label || "segmento"}`}
+                      value={segment.asset_id}
+                      valueUrl={segment.assetUrl}
+                      onChange={(id, url) => updateSegment(segment.id, { asset_id: id, assetUrl: url })}
                     />
                   </Field>
                   <div className="space-y-3">
-                    <Field label="Título del resultado">
-                      <Input
-                        value={seg.result_title}
-                        onChange={(e) =>
-                          updateSegment(seg.id, { result_title: e.target.value })
-                        }
-                      />
+                    <Field label="Titulo del resultado">
+                      <Input value={segment.result_title} onChange={(event) => updateSegment(segment.id, { result_title: event.target.value })} />
                     </Field>
                     <Field label="Texto del resultado">
-                      <Input
-                        value={seg.result_text}
-                        onChange={(e) =>
-                          updateSegment(seg.id, { result_text: e.target.value })
-                        }
-                      />
+                      <Input value={segment.result_text} onChange={(event) => updateSegment(segment.id, { result_text: event.target.value })} />
                     </Field>
                   </div>
                 </div>
@@ -372,35 +563,22 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                 <div className="mt-3">
                   <Advanced label="Stock / inventario">
                     <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-                      <Toggle
-                        checked={seg.stock_managed}
-                        onChange={(v) =>
-                          updateSegment(seg.id, { stock_managed: v })
-                        }
-                        label="Controlar stock"
-                      />
+                      <Toggle checked={segment.stock_managed} onChange={(value) => updateSegment(segment.id, { stock_managed: value })} label="Controlar stock" />
                       Controlar stock de este premio
                     </label>
-                    {seg.stock_managed && (
+                    {segment.stock_managed && (
                       <div className="grid gap-3 sm:grid-cols-2">
-                        <Field
-                          label="Stock total"
-                          hint="Al guardar, el stock disponible se ajusta a este máximo."
-                        >
+                        <Field label="Stock total" hint="Al guardar, el stock disponible se ajusta a este maximo.">
                           <Input
                             type="number"
                             min={0}
-                            value={seg.total_stock}
-                            onChange={(e) =>
-                              updateSegment(seg.id, {
-                                total_stock: e.target.value,
-                              })
-                            }
+                            value={segment.total_stock}
+                            onChange={(event) => updateSegment(segment.id, { total_stock: event.target.value })}
                           />
                         </Field>
-                        {seg.remaining_stock != null && (
+                        {segment.remaining_stock != null && (
                           <Field label="Disponible actual">
-                            <Input value={seg.remaining_stock} disabled readOnly />
+                            <Input value={segment.remaining_stock} disabled readOnly />
                           </Field>
                         )}
                       </div>
@@ -414,13 +592,8 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
       </Card>
 
       <div className="sticky bottom-4 flex justify-end">
-        <Button
-          onClick={save}
-          loading={isPending}
-          disabled={!validation.success}
-          className="shadow-soft"
-        >
-          <Save size={16} /> Guardar configuración
+        <Button onClick={save} loading={isPending} disabled={!validation.success} className="shadow-soft">
+          <Save size={16} /> Guardar configuracion
         </Button>
       </div>
     </div>

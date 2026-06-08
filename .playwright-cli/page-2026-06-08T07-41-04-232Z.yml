@@ -1,0 +1,21 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [ref=e7]: CBS+
+          - generic [ref=e8]: CNH
+        - generic [ref=e9]:
+          - heading "Panel de administración" [level=1] [ref=e10]
+          - paragraph [ref=e11]: Ingresá para configurar los juegos
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Usuario
+          - textbox "Usuario" [ref=e15]
+        - generic [ref=e16]:
+          - generic [ref=e17]: Contraseña
+          - textbox "Contraseña" [ref=e18]
+        - button "Ingresar" [ref=e19]:
+          - img [ref=e20]
+          - text: Ingresar
+  - region "Notifications alt+T"

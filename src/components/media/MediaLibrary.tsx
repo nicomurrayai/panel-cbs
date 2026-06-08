@@ -1,33 +1,57 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Upload, Trash2, RefreshCw, ImageOff } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { ImageOff, RefreshCw, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import {
-  uploadImageAsset,
-  replaceImageAsset,
-  deleteImageAsset,
-} from "@/actions/media";
-import {
-  IMAGE_ACCEPT,
-  validateImageFile,
-  humanFileSize,
-  IMAGE_MAX_BYTES,
-} from "@/lib/validation/media";
+import { deleteImageAsset, replaceImageAsset, uploadImageAsset } from "@/actions/media";
+import { IMAGE_ACCEPT, IMAGE_MAX_BYTES, humanFileSize, validateImageFile } from "@/lib/validation/media";
 import { readImageDimensions } from "@/lib/imageClient";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { MediaAssetView } from "@/types/panel";
+import { useSupabaseRealtime, type RealtimePayload } from "@/hooks/useSupabaseRealtime";
+import {
+  fetchImageAssetRows,
+  isVisibleImageAsset,
+  mediaAssetToView,
+  type MediaAssetRow,
+} from "@/lib/realtime/mediaAssets";
 
 export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
-  const router = useRouter();
   const uploadRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
   const replaceTarget = useRef<string | null>(null);
+  const [items, setItems] = useState(assets);
   const [busy, setBusy] = useState(false);
   const [toDelete, setToDelete] = useState<MediaAssetView | null>(null);
+
+  const applyAssetPayload = useCallback((payload: RealtimePayload<MediaAssetRow>) => {
+    const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as Partial<MediaAssetRow>;
+    const id = row.id;
+    if (!id) {
+      return;
+    }
+
+    setItems((current) => {
+      if (payload.eventType === "DELETE" || !isVisibleImageAsset(row)) {
+        return current.filter((asset) => asset.id !== id);
+      }
+
+      const nextAsset = mediaAssetToView(payload.new as MediaAssetRow);
+      return [nextAsset, ...current.filter((asset) => asset.id !== id)];
+    });
+  }, []);
+
+  useSupabaseRealtime({
+    channelName: "panel-cbs-media-library",
+    tables: ["media_assets"],
+    onChange: (_table, payload) => applyAssetPayload(payload as RealtimePayload<MediaAssetRow>),
+    onReconnect: async () => {
+      const rows = await fetchImageAssetRows();
+      setItems(rows.map(mediaAssetToView));
+    },
+  });
 
   async function buildForm(file: File) {
     const dims = await readImageDimensions(file);
@@ -36,6 +60,7 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
       toast.error(err);
       return null;
     }
+
     const form = new FormData();
     form.set("file", file);
     form.set("alt", file.name);
@@ -54,7 +79,9 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
       const res = await uploadImageAsset(form);
       if (res.ok) {
         toast.success("Imagen subida");
-        router.refresh();
+        if (res.data) {
+          setItems((current) => [res.data!, ...current.filter((asset) => asset.id !== res.data!.id)]);
+        }
       } else {
         toast.error(res.error);
       }
@@ -74,7 +101,9 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
       const res = await replaceImageAsset(id, form);
       if (res.ok) {
         toast.success("Imagen reemplazada");
-        router.refresh();
+        if (res.data) {
+          setItems((current) => [res.data!, ...current.filter((asset) => asset.id !== res.data!.id)]);
+        }
       } else {
         toast.error(res.error);
       }
@@ -89,7 +118,7 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
     const res = await deleteImageAsset(asset.id);
     if (res.ok) {
       toast.success("Imagen eliminada");
-      router.refresh();
+      setItems((current) => current.filter((item) => item.id !== asset.id));
     } else {
       toast.error(res.error);
     }
@@ -102,9 +131,9 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
         type="file"
         accept={IMAGE_ACCEPT}
         className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void onUpload(f);
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void onUpload(file);
         }}
       />
       <input
@@ -112,51 +141,46 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
         type="file"
         accept={IMAGE_ACCEPT}
         className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) void onReplace(f);
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void onReplace(file);
         }}
       />
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          {assets.length} {assets.length === 1 ? "imagen" : "imágenes"} · máx{" "}
-          {humanFileSize(IMAGE_MAX_BYTES)} por archivo
+          {items.length} {items.length === 1 ? "imagen" : "imagenes"} - max {humanFileSize(IMAGE_MAX_BYTES)} por archivo
         </p>
         <Button onClick={() => uploadRef.current?.click()} loading={busy}>
           <Upload size={16} /> Subir imagen
         </Button>
       </div>
 
-      {assets.length === 0 ? (
+      {items.length === 0 ? (
         <Card>
           <CardBody className="py-10 text-center text-sm text-muted">
-            Todavía no hay imágenes en el bucket. Subí la primera.
+            Todavia no hay imagenes en el bucket. Subi la primera.
           </CardBody>
         </Card>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {assets.map((a) => (
-            <Card key={a.id} className="overflow-hidden">
+          {items.map((asset) => (
+            <Card key={asset.id} className="overflow-hidden">
               <div className="grid aspect-video place-items-center overflow-hidden bg-cream">
-                {a.url ? (
+                {asset.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={a.url}
-                    alt={a.alt}
-                    className="h-full w-full object-contain"
-                  />
+                  <img src={asset.url} alt={asset.alt} className="h-full w-full object-contain" />
                 ) : (
                   <ImageOff className="text-muted/60" />
                 )}
               </div>
               <CardBody className="space-y-2 p-3">
-                <p className="truncate text-xs font-semibold text-ink" title={a.key}>
-                  {a.path?.split("/").pop() ?? a.key}
+                <p className="truncate text-xs font-semibold text-ink" title={asset.key}>
+                  {asset.path?.split("/").pop() ?? asset.key}
                 </p>
                 <p className="text-xs text-muted">
-                  {a.width && a.height ? `${a.width}×${a.height}` : "—"}
-                  {a.mimeType ? ` · ${a.mimeType.replace("image/", "")}` : ""}
+                  {asset.width && asset.height ? `${asset.width}x${asset.height}` : "-"}
+                  {asset.mimeType ? ` - ${asset.mimeType.replace("image/", "")}` : ""}
                 </p>
                 <div className="flex gap-1.5">
                   <Button
@@ -164,18 +188,13 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
                     size="sm"
                     className="flex-1"
                     onClick={() => {
-                      replaceTarget.current = a.id;
+                      replaceTarget.current = asset.id;
                       replaceRef.current?.click();
                     }}
                   >
                     <RefreshCw size={13} /> Reemplazar
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setToDelete(a)}
-                    aria-label="Eliminar"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => setToDelete(asset)} aria-label="Eliminar">
                     <Trash2 size={15} className="text-danger" />
                   </Button>
                 </div>
@@ -190,7 +209,7 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
         title="Eliminar imagen"
         danger
         confirmLabel="Eliminar"
-        message="Se borrará el archivo del almacenamiento. Los lugares que la usaban quedarán sin imagen. ¿Continuar?"
+        message="Se borrara el archivo del almacenamiento. Los lugares que la usaban quedaran sin imagen. Continuar?"
         onClose={() => setToDelete(null)}
         onConfirm={async () => {
           if (toDelete) await onDelete(toDelete);
