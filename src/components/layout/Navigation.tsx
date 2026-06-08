@@ -12,7 +12,6 @@ import { BrandMark } from "@/components/BrandMark";
 import { cn } from "@/lib/cn";
 
 export const NAV_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/ruleta", label: "Ruleta", icon: Disc3 },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/quiz", label: "Quiz", icon: HelpCircle },
 ];
