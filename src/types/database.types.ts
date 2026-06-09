@@ -169,6 +169,35 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          created_at: string
+          game_id: string | null
+          id: string
+          legajo: string
+        }
+        Insert: {
+          created_at?: string
+          game_id?: string | null
+          id?: string
+          legajo: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string | null
+          id?: string
+          legajo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_pairs: {
         Row: {
           active: boolean
