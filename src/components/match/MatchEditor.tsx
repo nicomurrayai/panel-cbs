@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
-import { DirectImageUpload } from "@/components/media/DirectImageUpload";
+import { ImagePicker } from "@/components/media/ImagePicker";
 import { PendingRemoteChange } from "@/components/realtime/PendingRemoteChange";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSupabaseRealtime, type RealtimePayload } from "@/hooks/useSupabaseRealtime";
@@ -235,7 +235,7 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
       <Card>
         <CardHeader
           title="Pares oracion-imagen"
-          description="Cada par une una oracion con su imagen correspondiente. El totem baraja las imagenes al jugar."
+          description="Cada par une una oracion con su imagen. Podes elegir la misma imagen en varios pares para que dos o mas oraciones apunten a una sola imagen. El totem baraja las imagenes al jugar."
           actions={
             <Button
               variant="secondary"
@@ -292,7 +292,7 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
                 </Field>
 
                 <Field label="Imagen" required={pair.active}>
-                  <DirectImageUpload
+                  <ImagePicker
                     label={`Imagen par ${index + 1}`}
                     value={pair.image_asset_id}
                     valueUrl={pair.imageUrl}
