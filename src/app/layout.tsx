@@ -9,8 +9,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Panel CBS — Administración de juegos",
-  description: "Panel de administración para configurar los juegos de CBS+CNH",
+  title: "Panel de administración de juegos",
+  description: "Panel de administración para configurar juegos interactivos",
 };
 
 export default function RootLayout({

@@ -4,9 +4,9 @@ import { Card, CardBody } from "@/components/ui/Card";
 /** Aviso cuando Supabase no esta configurado o falla la conexion. */
 export function SetupNotice({ error }: { error: string }) {
   return (
-    <Card className="border-orange/40">
+    <Card className="border-accent/40">
       <CardBody className="flex gap-4">
-        <AlertTriangle className="mt-0.5 shrink-0 text-orange-deep" />
+        <AlertTriangle className="mt-0.5 shrink-0 text-accent-deep" />
         <div className="space-y-2 text-sm">
           <p className="font-bold text-ink">No se pudo conectar con Supabase</p>
           <p className="text-muted">

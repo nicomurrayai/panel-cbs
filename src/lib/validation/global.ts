@@ -2,33 +2,37 @@ import { z } from "zod";
 import { hexColor } from "./common";
 
 export const THEME_FIELDS = [
-  { key: "cream", label: "Crema" },
-  { key: "creamStrong", label: "Crema fuerte" },
-  { key: "orange", label: "Naranja" },
-  { key: "orangeDeep", label: "Naranja oscuro" },
-  { key: "yellow", label: "Amarillo" },
-  { key: "ink", label: "Tinta (texto)" },
+  { key: "surface", label: "Fondo" },
+  { key: "surfaceStrong", label: "Superficie" },
+  { key: "accent", label: "Acento" },
+  { key: "accentDeep", label: "Acento oscuro" },
+  { key: "highlight", label: "Resalte" },
+  { key: "ink", label: "Texto" },
   { key: "muted", label: "Texto suave" },
-  { key: "cnhBlack", label: "Negro CNH" },
+  { key: "inverse", label: "Inverso" },
   { key: "success", label: "Éxito" },
+  { key: "danger", label: "Error" },
 ] as const;
 
 export const themeSchema = z.object({
-  cream: hexColor,
-  creamStrong: hexColor,
-  orange: hexColor,
-  orangeDeep: hexColor,
-  yellow: hexColor,
+  surface: hexColor,
+  surfaceStrong: hexColor,
+  accent: hexColor,
+  accentDeep: hexColor,
+  highlight: hexColor,
   ink: hexColor,
   muted: hexColor,
-  cnhBlack: hexColor,
+  inverse: hexColor,
   success: hexColor,
+  danger: hexColor,
 });
 
 export const brandingSchema = z.object({
   primaryName: z.string().trim().max(40),
   secondaryName: z.string().trim().max(40),
   footer: z.string().trim().max(120),
+  equipmentTitle: z.string().trim().max(80).optional().default(""),
+  logoAssetId: z.string().uuid().nullable().optional().default(null),
 });
 
 export const globalSettingsSchema = z.object({

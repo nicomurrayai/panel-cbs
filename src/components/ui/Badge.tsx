@@ -5,8 +5,8 @@ type Tone = "success" | "danger" | "neutral" | "warning" | "info";
 const tones: Record<Tone, string> = {
   success: "bg-success/12 text-success",
   danger: "bg-danger/12 text-danger",
-  warning: "bg-orange/15 text-orange-deep",
-  info: "bg-cnh/10 text-cnh",
+  warning: "bg-accent/15 text-accent-deep",
+  info: "bg-inverse/10 text-inverse",
   neutral: "bg-black/6 text-muted",
 };
 

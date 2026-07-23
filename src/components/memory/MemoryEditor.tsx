@@ -262,7 +262,7 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((card, index) => (
-              <div key={card.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-cream/30 p-3">
+              <div key={card.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-3">
                 <DirectImageUpload
                   label={`Carta ${index + 1}`}
                   value={card.asset_id}

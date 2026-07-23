@@ -13,7 +13,7 @@ export function Advanced({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-dashed border-panel-border bg-cream/30">
+    <div className="rounded-xl border border-dashed border-panel-border bg-surface/30">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

@@ -31,7 +31,7 @@ export function Thumb({
   return (
     <div
       className={cn(
-        "grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-panel-border bg-cream",
+        "grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-panel-border bg-surface",
         className,
       )}
     >
@@ -191,9 +191,9 @@ export function ImagePicker({
             type="button"
             disabled={uploading}
             onClick={() => fileRef.current?.click()}
-            className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-panel-border bg-cream/40 px-4 py-6 text-sm text-muted transition hover:border-orange hover:bg-cream-strong disabled:opacity-60"
+            className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-panel-border bg-surface/40 px-4 py-6 text-sm text-muted transition hover:border-accent hover:bg-surface-strong disabled:opacity-60"
           >
-            {uploading ? <Spinner /> : <Upload size={22} className="text-orange-deep" />}
+            {uploading ? <Spinner /> : <Upload size={22} className="text-accent-deep" />}
             <span className="font-semibold text-ink">{uploading ? "Subiendo..." : "Subir nueva imagen"}</span>
             <span className="text-xs">PNG, JPG, WEBP o SVG - max {humanFileSize(IMAGE_MAX_BYTES)}</span>
           </button>
@@ -219,8 +219,8 @@ export function ImagePicker({
                         setOpen(false);
                       }}
                       className={cn(
-                        "group relative aspect-square overflow-hidden rounded-xl border bg-cream transition",
-                        selected ? "border-orange ring-2 ring-orange/40" : "border-panel-border hover:border-orange",
+                        "group relative aspect-square overflow-hidden rounded-xl border bg-surface transition",
+                        selected ? "border-accent ring-2 ring-accent/40" : "border-panel-border hover:border-accent",
                       )}
                       title={asset.alt || asset.key}
                     >
@@ -231,7 +231,7 @@ export function ImagePicker({
                         <ImageOff size={18} className="m-auto text-muted/60" />
                       )}
                       {selected && (
-                        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-orange text-white">
+                        <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-accent text-white">
                           <Check size={12} />
                         </span>
                       )}

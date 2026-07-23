@@ -31,12 +31,18 @@ export function currentLabel(pathname: string): string {
   return match?.label ?? "Panel";
 }
 
-export function Sidebar() {
+type BrandingProps = {
+  primaryName?: string;
+  secondaryName?: string;
+  logoUrl?: string | null;
+};
+
+export function Sidebar({ primaryName, secondaryName, logoUrl }: BrandingProps) {
   const pathname = usePathname();
   return (
     <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-1 border-r border-panel-border bg-white/70 px-3 py-5 backdrop-blur md:flex">
       <div className="px-2 pb-5">
-        <BrandMark />
+        <BrandMark primaryName={primaryName} secondaryName={secondaryName} logoUrl={logoUrl} />
       </div>
       <nav className="flex flex-col gap-1">
         {NAV_LINKS.map(({ href, label, icon: Icon }) => {
@@ -48,8 +54,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition",
                 active
-                  ? "bg-orange text-white shadow-tight"
-                  : "text-ink hover:bg-cream-strong",
+                  ? "bg-accent text-white shadow-tight"
+                  : "text-ink hover:bg-surface-strong",
               )}
             >
               <Icon size={18} />
@@ -58,7 +64,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <p className="mt-auto px-2 text-xs text-muted">CBS+CNH · Admin</p>
+      <p className="mt-auto px-2 text-xs text-muted">Admin</p>
     </aside>
   );
 }
@@ -75,7 +81,7 @@ export function MobileNav() {
             href={href}
             className={cn(
               "flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition",
-              active ? "bg-orange text-white" : "text-ink hover:bg-cream-strong",
+              active ? "bg-accent text-white" : "text-ink hover:bg-surface-strong",
             )}
           >
             <Icon size={16} />

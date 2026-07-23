@@ -345,8 +345,8 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         label: "",
         prize_type: "prize",
         probability_weight: "1",
-        color: "#ffd100",
-        text_color: "#17171d",
+        color: "#171717",
+        text_color: "#ffffff",
         enabled: true,
         sort_order: prev.length,
         asset_id: null,
@@ -466,7 +466,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
             const weight = Number(segment.probability_weight) || 0;
             const pct = segment.enabled && totalWeight > 0 ? ((weight / totalWeight) * 100).toFixed(1) : "0.0";
             return (
-              <div key={segment.id} className="rounded-2xl border border-panel-border bg-cream/30 p-4">
+              <div key={segment.id} className="rounded-2xl border border-panel-border bg-surface/30 p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span
                     className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold"

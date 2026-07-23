@@ -3,6 +3,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { assetUrl } from "@/lib/supabase/storage";
 import { one } from "@/lib/embed";
 import type { ThemeConfig, BrandingConfig } from "@/lib/validation/global";
+import { DEFAULT_BRANDING, DEFAULT_THEME, normalizeBranding, normalizeTheme } from "@/lib/theme";
 
 export type GlobalSettingsView = {
   version: string;
@@ -13,24 +14,7 @@ export type GlobalSettingsView = {
   backgroundUrl: string | null;
   theme: ThemeConfig;
   branding: BrandingConfig;
-};
-
-const DEFAULT_THEME: ThemeConfig = {
-  cream: "#fff3dc",
-  creamStrong: "#fff8ec",
-  orange: "#f5a400",
-  orangeDeep: "#df8800",
-  yellow: "#ffd100",
-  ink: "#1f1f25",
-  muted: "#6f6255",
-  cnhBlack: "#17171d",
-  success: "#34785f",
-};
-
-const DEFAULT_BRANDING: BrandingConfig = {
-  primaryName: "CBS+",
-  secondaryName: "CNH",
-  footer: "Because I Care",
+  logoUrl: string | null;
 };
 
 export async function getGlobalSettings(): Promise<GlobalSettingsView> {
@@ -45,15 +29,22 @@ export async function getGlobalSettings(): Promise<GlobalSettingsView> {
 
   if (error) throw error;
 
-  const theme = { ...DEFAULT_THEME, ...((data?.theme as Partial<ThemeConfig>) ?? {}) };
-  const branding = {
-    ...DEFAULT_BRANDING,
-    ...((data?.branding as Partial<BrandingConfig>) ?? {}),
-  };
+  const theme = normalizeTheme(data?.theme ?? DEFAULT_THEME);
+  const branding = normalizeBranding(data?.branding ?? DEFAULT_BRANDING);
   const background = one(
     (data as { background?: Parameters<typeof assetUrl>[0] | Parameters<typeof assetUrl>[0][] } | null)
       ?.background,
   );
+
+  let logoUrl: string | null = null;
+  if (branding.logoAssetId) {
+    const { data: logoAsset } = await supabase
+      .from("media_assets")
+      .select("public_url,bucket,path,fallback_src")
+      .eq("id", branding.logoAssetId)
+      .maybeSingle();
+    logoUrl = assetUrl(logoAsset);
+  }
 
   return {
     version: data?.version ?? new Date().toISOString().slice(0, 10),
@@ -64,5 +55,6 @@ export async function getGlobalSettings(): Promise<GlobalSettingsView> {
     backgroundUrl: assetUrl(background),
     theme,
     branding,
+    logoUrl,
   };
 }

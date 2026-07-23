@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 
-export const SESSION_COOKIE = "cbs_session";
+export const SESSION_COOKIE = "admin_session";
 export const SESSION_MAX_AGE = 60 * 60 * 12; // 12 horas
 
 function getSecret(): Uint8Array {

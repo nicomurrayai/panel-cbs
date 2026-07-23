@@ -1,4 +1,4 @@
-# Panel de administración de juegos — CBS+CNH
+# Panel de administración de juegos
 
 Panel web para configurar los juegos (Ruleta, Memory Card y Quiz) que la app
 `panel-juegos` lee desde Supabase. Pensado para que una persona **no técnica**

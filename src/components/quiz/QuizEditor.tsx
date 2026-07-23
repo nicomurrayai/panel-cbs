@@ -272,7 +272,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {questions.map((question, index) => (
-              <div key={question.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-cream/30 p-4">
+              <div key={question.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-bold text-muted">#{index + 1}</span>
                   <div className="flex items-center gap-2">
@@ -325,7 +325,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                             ? value
                               ? "border-success bg-success/12 text-success"
                               : "border-danger bg-danger/12 text-danger"
-                            : "border-panel-border bg-white text-muted hover:bg-cream-strong",
+                            : "border-panel-border bg-white text-muted hover:bg-surface-strong",
                         )}
                       >
                         <Icon size={15} /> {label}

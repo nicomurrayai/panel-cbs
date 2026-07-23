@@ -5,6 +5,7 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 import type { GlobalSettingsView } from "@/lib/data/global";
 import { THEME_FIELDS, globalSettingsSchema, type BrandingConfig, type ThemeConfig } from "@/lib/validation/global";
+import { DEFAULT_BRANDING, DEFAULT_THEME, normalizeBranding, normalizeTheme } from "@/lib/theme";
 import { saveGlobalSettings } from "@/actions/global";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -31,24 +32,7 @@ type GlobalForm = {
   backgroundUrl: string | null;
   theme: ThemeConfig;
   branding: BrandingConfig;
-};
-
-const DEFAULT_THEME: ThemeConfig = {
-  cream: "#fff3dc",
-  creamStrong: "#fff8ec",
-  orange: "#f5a400",
-  orangeDeep: "#df8800",
-  yellow: "#ffd100",
-  ink: "#1f1f25",
-  muted: "#6f6255",
-  cnhBlack: "#17171d",
-  success: "#34785f",
-};
-
-const DEFAULT_BRANDING: BrandingConfig = {
-  primaryName: "CBS+",
-  secondaryName: "CNH",
-  footer: "Because I Care",
+  logoUrl: string | null;
 };
 
 function formFromSettings(settings: GlobalSettingsView): GlobalForm {
@@ -60,19 +44,24 @@ function formFromSettings(settings: GlobalSettingsView): GlobalForm {
     backgroundUrl: settings.backgroundUrl,
     theme: settings.theme,
     branding: settings.branding,
+    logoUrl: settings.logoUrl,
   };
 }
 
 async function formFromRow(row: GlobalSettingsRow): Promise<GlobalForm> {
   const background = await fetchMediaAssetById(row.home_background_asset_id);
+  const branding = normalizeBranding(row.branding);
+  const logo = branding.logoAssetId ? await fetchMediaAssetById(branding.logoAssetId) : null;
+
   return {
     home_eyebrow: row.home_eyebrow,
     home_title: row.home_title,
     home_subtitle: row.home_subtitle,
     home_background_asset_id: row.home_background_asset_id,
     backgroundUrl: assetUrl(background),
-    theme: { ...DEFAULT_THEME, ...((row.theme as Partial<ThemeConfig>) ?? {}) },
-    branding: { ...DEFAULT_BRANDING, ...((row.branding as Partial<BrandingConfig>) ?? {}) },
+    theme: normalizeTheme(row.theme),
+    branding,
+    logoUrl: assetUrl(logo),
   };
 }
 
@@ -95,6 +84,79 @@ async function fetchGlobalForm() {
   return data ? formFromRow(data) : null;
 }
 
+function ThemePreview({
+  theme,
+  branding,
+  logoUrl,
+}: {
+  theme: ThemeConfig;
+  branding: BrandingConfig;
+  logoUrl: string | null;
+}) {
+  const primary = branding.primaryName.trim();
+  const secondary = branding.secondaryName.trim();
+  const footer = branding.footer.trim();
+  const equipment = (branding.equipmentTitle ?? "").trim();
+
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-panel-border shadow-tight"
+      style={{ background: theme.surface, color: theme.ink }}
+    >
+      <div className="flex flex-col items-center gap-3 px-4 py-6" style={{ background: theme.surfaceStrong }}>
+        <div
+          className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-extrabold"
+          style={{ borderColor: `${theme.ink}20`, background: `${theme.surfaceStrong}cc` }}
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="h-5 w-auto max-w-[5rem] object-contain" />
+          ) : null}
+          {primary ? <span style={{ color: theme.accentDeep }}>{primary}</span> : null}
+          {primary && secondary ? (
+            <span className="h-4 w-px" style={{ background: `${theme.ink}33` }} aria-hidden />
+          ) : null}
+          {secondary ? <span style={{ color: theme.inverse }}>{secondary}</span> : null}
+        </div>
+        {equipment ? (
+          <p className="text-center text-lg font-bold leading-tight" style={{ color: theme.ink }}>
+            {equipment}
+          </p>
+        ) : null}
+        <div className="mt-2 flex w-full max-w-xs gap-2">
+          <span
+            className="h-10 flex-1 rounded-xl text-center text-xs font-semibold leading-10 text-white"
+            style={{ background: theme.accent }}
+          >
+            CTA
+          </span>
+          <span
+            className="h-10 flex-1 rounded-xl border text-center text-xs font-semibold leading-10"
+            style={{ borderColor: `${theme.ink}20`, color: theme.muted, background: theme.surfaceStrong }}
+          >
+            Secundario
+          </span>
+        </div>
+        {footer ? (
+          <p className="mt-2 text-xs font-semibold" style={{ color: theme.muted }}>
+            {footer}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex gap-1 px-4 py-3">
+        {THEME_FIELDS.slice(0, 6).map(({ key }) => (
+          <span
+            key={key}
+            className="h-3 flex-1 rounded-full"
+            style={{ background: theme[key] }}
+            title={key}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromSettings(settings), [settings]);
@@ -105,7 +167,11 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
   const [bgId, setBgId] = useState(initialForm.home_background_asset_id);
   const [bgUrl, setBgUrl] = useState(initialForm.backgroundUrl);
   const [theme, setTheme] = useState<ThemeConfig>(initialForm.theme);
-  const [branding, setBranding] = useState<BrandingConfig>(initialForm.branding);
+  const [branding, setBranding] = useState<BrandingConfig>({
+    ...DEFAULT_BRANDING,
+    ...initialForm.branding,
+  });
+  const [logoUrl, setLogoUrl] = useState(initialForm.logoUrl);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<GlobalForm | null>(null);
 
@@ -118,8 +184,9 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
       backgroundUrl: bgUrl,
       theme,
       branding,
+      logoUrl,
     }),
-    [bgId, bgUrl, branding, eyebrow, subtitle, theme, title],
+    [bgId, bgUrl, branding, eyebrow, logoUrl, subtitle, theme, title],
   );
   const isDirty = !sameJson(currentForm, baseline);
 
@@ -130,7 +197,8 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
     setBgId(form.home_background_asset_id);
     setBgUrl(form.backgroundUrl);
     setTheme(form.theme);
-    setBranding(form.branding);
+    setBranding({ ...DEFAULT_BRANDING, ...form.branding });
+    setLogoUrl(form.logoUrl);
     setBaseline(form);
     setPendingRemote(null);
   }, []);
@@ -165,6 +233,9 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
       if (row.id && row.id === bgId) {
         setBgUrl(mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow));
       }
+      if (row.id && row.id === branding.logoAssetId) {
+        setLogoUrl(mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow));
+      }
     },
     onReconnect: async () => {
       const form = await fetchGlobalForm();
@@ -185,7 +256,11 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
       home_subtitle: subtitle,
       home_background_asset_id: bgId,
       theme,
-      branding,
+      branding: {
+        ...branding,
+        equipmentTitle: branding.equipmentTitle ?? "",
+        logoAssetId: branding.logoAssetId ?? null,
+      },
     };
     const parsed = globalSettingsSchema.safeParse(input);
     if (!parsed.success) {
@@ -207,6 +282,16 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
       {pendingRemote ? (
         <PendingRemoteChange onApply={() => applyForm(pendingRemote)} onDismiss={() => setPendingRemote(null)} />
       ) : null}
+
+      <Card>
+        <CardHeader
+          title="Vista previa del tótem"
+          description="Refleja nombres y colores tal como se verán en la app de juegos."
+        />
+        <CardBody>
+          <ThemePreview theme={theme} branding={branding} logoUrl={logoUrl} />
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader title="Pantalla principal" />
@@ -235,8 +320,8 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
       </Card>
 
       <Card>
-        <CardHeader title="Marca" description="Nombres y pie de pagina de la identidad." />
-        <CardBody className="grid gap-4 md:grid-cols-3">
+        <CardHeader title="Marca" description="Identidad configurable del tótem. Dejá vacío lo que no quieras mostrar." />
+        <CardBody className="grid gap-4 md:grid-cols-2">
           <Field label="Nombre principal">
             <Input
               value={branding.primaryName}
@@ -255,15 +340,36 @@ export function GlobalEditor({ settings }: { settings: GlobalSettingsView }) {
               onChange={(event) => setBranding((value) => ({ ...value, footer: event.target.value }))}
             />
           </Field>
+          <Field label="Titulo de equipo (opcional)">
+            <Input
+              value={branding.equipmentTitle ?? ""}
+              onChange={(event) => setBranding((value) => ({ ...value, equipmentTitle: event.target.value }))}
+              placeholder="Ej. Equipo / Evento"
+            />
+          </Field>
+          <Field label="Logo (opcional)" className="md:col-span-2">
+            <ImagePicker
+              label="Logo de marca"
+              value={branding.logoAssetId ?? null}
+              valueUrl={logoUrl}
+              onChange={(id, url) => {
+                setBranding((value) => ({ ...value, logoAssetId: id }));
+                setLogoUrl(url);
+              }}
+            />
+          </Field>
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Paleta de colores" description="Estos colores se aplican al tema de la app." />
+        <CardHeader title="Paleta de colores" description="Tokens semánticos que el tótem aplica en tiempo real." />
         <CardBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {THEME_FIELDS.map(({ key, label }) => (
             <Field key={key} label={label}>
-              <ColorField value={theme[key]} onChange={(value) => setThemeKey(key, value)} />
+              <ColorField
+                value={theme[key] ?? DEFAULT_THEME[key]}
+                onChange={(value) => setThemeKey(key, value)}
+              />
             </Field>
           ))}
         </CardBody>

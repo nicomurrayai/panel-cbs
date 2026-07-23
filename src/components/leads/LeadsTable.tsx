@@ -173,7 +173,7 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
                 rows.map((lead) => (
                   <tr
                     key={lead.id}
-                    className="border-b border-panel-border/60 transition hover:bg-cream-strong/60"
+                    className="border-b border-panel-border/60 transition hover:bg-surface-strong/60"
                   >
                     <td className="px-5 py-3 font-semibold text-ink">{lead.legajo}</td>
                     <td className="px-5 py-3 text-muted">{formatDate(lead.created_at)}</td>

@@ -263,7 +263,7 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {pairs.map((pair, index) => (
-              <div key={pair.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-cream/30 p-4">
+              <div key={pair.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-bold text-muted">#{index + 1}</span>
                   <div className="flex items-center gap-2">

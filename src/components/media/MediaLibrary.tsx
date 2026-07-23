@@ -166,7 +166,7 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {items.map((asset) => (
             <Card key={asset.id} className="overflow-hidden">
-              <div className="grid aspect-video place-items-center overflow-hidden bg-cream">
+              <div className="grid aspect-video place-items-center overflow-hidden bg-surface">
                 {asset.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={asset.url} alt={asset.alt} className="h-full w-full object-contain" />

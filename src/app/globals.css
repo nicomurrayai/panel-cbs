@@ -1,28 +1,27 @@
 @import "tailwindcss";
 
 /* ----------------------------------------------------------------------------
-   Tokens de marca CBS+CNH (tomados de panel-juegos/src/styles.css) para mantener
-   un look & feel consistente con la app de juegos.
+   Design tokens neutros (alineados con panel-juegos/src/styles.css).
+   Themables vía global_settings.theme en el tótem; chrome del admin usa estos defaults.
 ---------------------------------------------------------------------------- */
 @theme {
-  --color-cream: #fff3dc;
-  --color-cream-strong: #fff8ec;
-  --color-orange: #f5a400;
-  --color-orange-deep: #df8800;
-  --color-yellow: #ffd100;
-  --color-ink: #1f1f25;
-  --color-muted: #6f6255;
-  --color-cnh: #17171d;
-  --color-success: #34785f;
-  --color-danger: #df4646;
-  --color-panel-border: rgba(120, 82, 20, 0.18);
-  --color-surface: #ffffff;
+  --color-surface: #fafafa;
+  --color-surface-strong: #ffffff;
+  --color-accent: #171717;
+  --color-accent-deep: #0a0a0a;
+  --color-highlight: #525252;
+  --color-ink: #171717;
+  --color-muted: #737373;
+  --color-inverse: #0a0a0a;
+  --color-success: #3f6f5a;
+  --color-danger: #c44545;
+  --color-panel-border: rgba(23, 23, 23, 0.12);
 
   --font-sans: var(--font-geist-sans), "Segoe UI Variable", "Segoe UI", system-ui,
     sans-serif;
 
-  --shadow-soft: 0 1.4rem 3.4rem rgba(104, 71, 21, 0.16);
-  --shadow-tight: 0 0.8rem 1.8rem rgba(104, 71, 21, 0.16);
+  --shadow-soft: 0 1.4rem 3.4rem rgba(23, 23, 23, 0.1);
+  --shadow-tight: 0 0.8rem 1.8rem rgba(23, 23, 23, 0.1);
 
   --radius-xl: 1.25rem;
 }
@@ -33,11 +32,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 100% -10%, rgba(255, 209, 0, 0.18), transparent 60%),
-    radial-gradient(900px 500px at -10% 0%, rgba(245, 164, 0, 0.14), transparent 55%),
-    linear-gradient(180deg, #fff8ec 0%, #fff3dc 100%);
-  background-attachment: fixed;
+  background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
@@ -45,5 +40,5 @@ body {
 /* Scrollbar discreto y consistente */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(120, 82, 20, 0.28) transparent;
+  scrollbar-color: rgba(23, 23, 23, 0.28) transparent;
 }
