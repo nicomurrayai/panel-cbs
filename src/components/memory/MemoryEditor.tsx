@@ -4,13 +4,18 @@ import { useCallback, useMemo, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MemoryConfigView } from "@/lib/data/memory";
-import { memoryConfigSchema } from "@/lib/validation/memory";
+import {
+  MEMORY_PLAYER_MODE_OPTIONS,
+  memoryConfigSchema,
+  type MemoryPlayerMode,
+} from "@/lib/validation/memory";
 import { saveMemoryConfig } from "@/actions/memory";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
+import { cn } from "@/lib/cn";
 import { DirectImageUpload } from "@/components/media/DirectImageUpload";
 import { PendingRemoteChange } from "@/components/realtime/PendingRemoteChange";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -34,6 +39,7 @@ type CardForm = {
 
 type MemoryForm = {
   time_limit_seconds: string;
+  player_mode: MemoryPlayerMode;
   cards: CardForm[];
 };
 
@@ -44,6 +50,7 @@ function sortCards(cards: CardForm[]) {
 function formFromConfig(config: MemoryConfigView): MemoryForm {
   return {
     time_limit_seconds: String(config.time_limit_seconds),
+    player_mode: config.player_mode,
     cards: config.cards.map((card, index) => ({ ...card, sort_order: index })),
   };
 }
@@ -74,8 +81,11 @@ async function fetchMemoryForm(): Promise<MemoryForm | null> {
   if (cardsRes.error) throw cardsRes.error;
 
   const cards = await Promise.all(((cardsRes.data ?? []) as MemoryCardRow[]).map(cardFromRow));
+  const playerMode = settingsRes.data?.player_mode;
   return {
     time_limit_seconds: String(settingsRes.data?.time_limit_seconds ?? 60),
+    player_mode:
+      playerMode === "two" || playerMode === "selectable" || playerMode === "one" ? playerMode : "one",
     cards: sortCards(cards),
   };
 }
@@ -84,18 +94,20 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState(initialForm.time_limit_seconds);
+  const [playerMode, setPlayerMode] = useState<MemoryPlayerMode>(initialForm.player_mode);
   const [cards, setCards] = useState<CardForm[]>(initialForm.cards.map((card) => ({ ...card })));
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<MemoryForm | null>(null);
 
   const currentForm = useMemo<MemoryForm>(
-    () => ({ time_limit_seconds: timeLimitSeconds, cards }),
-    [cards, timeLimitSeconds],
+    () => ({ time_limit_seconds: timeLimitSeconds, player_mode: playerMode, cards }),
+    [cards, playerMode, timeLimitSeconds],
   );
   const isDirty = !sameJson(currentForm, baseline);
 
   const applyForm = useCallback((form: MemoryForm) => {
     setTimeLimitSeconds(form.time_limit_seconds);
+    setPlayerMode(form.player_mode);
     setCards(sortCards(form.cards).map((card) => ({ ...card })));
     setBaseline(form);
     setPendingRemote(null);
@@ -134,7 +146,13 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
       if (table === "memory_settings") {
         const row = (payload as RealtimePayload<MemorySettingsRow>).new;
         if (payload.eventType !== "DELETE" && row.game_id === "memory") {
-          const next = { ...currentForm, time_limit_seconds: String(row.time_limit_seconds) };
+          const mode = row.player_mode;
+          const next = {
+            ...currentForm,
+            time_limit_seconds: String(row.time_limit_seconds),
+            player_mode:
+              mode === "two" || mode === "selectable" || mode === "one" ? mode : currentForm.player_mode,
+          };
           applyForm(next);
         }
         return;
@@ -202,6 +220,7 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
   function buildInput() {
     return {
       time_limit_seconds: Number(timeLimitSeconds) || 0,
+      player_mode: playerMode,
       cards: cards.map((card) => ({
         id: card.id,
         asset_id: card.asset_id,
@@ -233,8 +252,11 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
       ) : null}
 
       <Card>
-        <CardHeader title="Configuracion" description="Define el tiempo maximo y las imagenes disponibles para armar el tablero." />
-        <CardBody>
+        <CardHeader
+          title="Configuracion"
+          description="Tiempo, modo de jugadores e imagenes disponibles para armar el tablero."
+        />
+        <CardBody className="space-y-5">
           <Field label="Tiempo maximo (seg)">
             <Input
               type="number"
@@ -243,6 +265,30 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
               value={timeLimitSeconds}
               onChange={(event) => setTimeLimitSeconds(event.target.value)}
             />
+          </Field>
+
+          <Field label="Modo de jugadores">
+            <div className="grid gap-2">
+              {MEMORY_PLAYER_MODE_OPTIONS.map((option) => {
+                const active = playerMode === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPlayerMode(option.value)}
+                    className={cn(
+                      "rounded-2xl border px-4 py-3 text-left transition",
+                      active
+                        ? "border-accent bg-accent/10 shadow-sm"
+                        : "border-panel-border bg-white hover:border-accent/50",
+                    )}
+                  >
+                    <p className="text-sm font-bold text-ink">{option.label}</p>
+                    <p className="mt-0.5 text-xs text-muted">{option.description}</p>
+                  </button>
+                );
+              })}
+            </div>
           </Field>
         </CardBody>
       </Card>

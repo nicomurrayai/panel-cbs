@@ -376,16 +376,19 @@ export type Database = {
       memory_settings: {
         Row: {
           game_id: string
+          player_mode: string
           time_limit_seconds: number
           updated_at: string
         }
         Insert: {
           game_id: string
+          player_mode?: string
           time_limit_seconds?: number
           updated_at?: string
         }
         Update: {
           game_id?: string
+          player_mode?: string
           time_limit_seconds?: number
           updated_at?: string
         }

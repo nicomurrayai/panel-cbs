@@ -11,13 +11,13 @@ export async function saveMemoryConfig(input: unknown): Promise<ActionResult> {
     return fail(parsed.error.issues[0]?.message ?? "Configuracion invalida.");
   }
 
-  const { time_limit_seconds, cards } = parsed.data;
+  const { time_limit_seconds, player_mode, cards } = parsed.data;
   const supabase = getAdminClient();
 
   try {
     const { error: settingsError } = await supabase
       .from("memory_settings")
-      .upsert({ game_id: "memory", time_limit_seconds });
+      .upsert({ game_id: "memory", time_limit_seconds, player_mode });
     if (settingsError) {
       throw settingsError;
     }
