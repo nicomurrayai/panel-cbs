@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { loadLeads, exportLeads } from "@/actions/leads";
-import { leadPayloadRecord, type LeadsPage } from "@/lib/data/leads";
+import { leadPayloadRecord, type LeadsPage } from "@/lib/leads/shared";
 import type { LeadsFormConfig } from "@/lib/validation/leadsForm";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { Card, CardBody } from "@/components/ui/Card";

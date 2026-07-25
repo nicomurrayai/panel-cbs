@@ -1,16 +1,15 @@
 import "server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
-import type { Database, Json } from "@/types/database.types";
 import { DEFAULT_LEADS_FORM, normalizeLeadsForm, type LeadsFormConfig } from "@/lib/validation/leadsForm";
+import {
+  LEADS_PAGE_SIZE,
+  type LeadRow,
+  type LeadsPage,
+} from "@/lib/leads/shared";
 
-export type LeadRow = Database["public"]["Tables"]["leads"]["Row"];
-
-export type LeadsPage = {
-  rows: LeadRow[];
-  total: number;
-};
-
-export const LEADS_PAGE_SIZE = 20;
+export type { LeadRow, LeadsPage };
+export { LEADS_PAGE_SIZE };
+export { leadPayloadRecord, leadMatchesSearch } from "@/lib/leads/shared";
 
 export async function getLeadsFormConfig(): Promise<LeadsFormConfig> {
   const supabase = getAdminClient();
@@ -21,13 +20,6 @@ export async function getLeadsFormConfig(): Promise<LeadsFormConfig> {
     .maybeSingle();
   if (error) throw error;
   return normalizeLeadsForm(data?.leads_form ?? DEFAULT_LEADS_FORM);
-}
-
-function payloadText(payload: Json | null | undefined): string {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "";
-  return Object.values(payload)
-    .filter((value): value is string => typeof value === "string")
-    .join(" ");
 }
 
 /** Pagina de leads ordenada por fecha de creacion descendente, con total exacto. */
@@ -75,28 +67,4 @@ export async function getAllLeads(search?: string): Promise<LeadRow[]> {
   }
 
   return data ?? [];
-}
-
-export function leadPayloadRecord(lead: LeadRow): Record<string, string> {
-  const payload = lead.payload;
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return lead.legajo ? { legajo: lead.legajo } : {};
-  }
-  const record: Record<string, string> = {};
-  for (const [key, value] of Object.entries(payload)) {
-    if (typeof value === "string" || typeof value === "number") {
-      record[key] = String(value);
-    }
-  }
-  if (!record.legajo && lead.legajo) {
-    record.legajo = lead.legajo;
-  }
-  return record;
-}
-
-export function leadMatchesSearch(lead: LeadRow, term: string): boolean {
-  const needle = term.trim().toLowerCase();
-  if (!needle) return true;
-  const haystack = `${lead.legajo} ${payloadText(lead.payload)}`.toLowerCase();
-  return haystack.includes(needle);
 }
