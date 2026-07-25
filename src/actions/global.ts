@@ -30,8 +30,14 @@ export async function saveGlobalSettings(
       home_title: data.home_title,
       home_subtitle: data.home_subtitle,
       home_background_asset_id: data.home_background_asset_id,
+      attract_media_asset_id: data.attract_media_asset_id,
+      idle_timeout_seconds: data.idle_timeout_seconds,
+      auto_reset_seconds: data.auto_reset_seconds,
       theme: data.theme,
       branding: data.branding,
+      typography: data.typography,
+      home_chrome: data.home_chrome,
+      surface_config: data.surface_config,
     });
     if (error) throw error;
 

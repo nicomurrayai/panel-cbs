@@ -17,8 +17,8 @@ export default async function GlobalPage() {
   return (
     <>
       <PageIntro
-        title="Ajustes globales"
-        description="Textos de la pantalla principal, marca y paleta de colores."
+        title="Estudio de personalización"
+        description="Tema visual del tótem: paleta, tipografía, Attract Loop, cards y branding en tiempo real."
       />
       {error || !settings ? (
         <SetupNotice error={error ?? "Sin datos"} />

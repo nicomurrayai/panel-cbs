@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Brain,
+  Dices,
   HelpCircle,
   Link2,
+  Palette,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -13,12 +15,13 @@ import { BrandMark } from "@/components/BrandMark";
 import { cn } from "@/lib/cn";
 
 export const NAV_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/global", label: "Tema", icon: Palette },
+  { href: "/juegos", label: "Juegos", icon: Dices },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/quiz", label: "Quiz", icon: HelpCircle },
   { href: "/match", label: "Relacionar", icon: Link2 },
   { href: "/leads", label: "Leads", icon: Users },
 ];
-
 export function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);

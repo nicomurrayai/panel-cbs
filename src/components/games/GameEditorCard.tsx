@@ -7,6 +7,14 @@ import type { GameEditView } from "@/lib/data/games";
 import { gameLabel } from "@/lib/games";
 import { updateGame } from "@/actions/games";
 import { gameUpdateSchema } from "@/lib/validation/games";
+import { THEME_FIELDS } from "@/lib/validation/global";
+import {
+  CURATED_BODY_FONTS,
+  CURATED_DISPLAY_FONTS,
+  DEFAULT_GAME_THEME_OVERRIDE,
+  type GameThemeOverride,
+} from "@/lib/validation/themeEngine";
+import { normalizeGameThemeOverride } from "@/lib/theme";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Textarea } from "@/components/ui/Input";
@@ -40,6 +48,7 @@ type GameForm = {
   maintenance_text: string;
   cover_asset_id: string | null;
   coverUrl: string | null;
+  theme_config: GameThemeOverride;
 };
 
 function formFromView(game: GameEditView): GameForm {
@@ -56,6 +65,7 @@ function formFromView(game: GameEditView): GameForm {
     maintenance_text: game.maintenance_text ?? "",
     cover_asset_id: game.cover_asset_id,
     coverUrl: game.coverUrl,
+    theme_config: game.theme_config ?? DEFAULT_GAME_THEME_OVERRIDE,
   };
 }
 
@@ -74,6 +84,7 @@ async function formFromRow(row: GameRow): Promise<GameForm> {
     maintenance_text: row.maintenance_text ?? "",
     cover_asset_id: row.cover_asset_id,
     coverUrl: assetUrl(cover),
+    theme_config: normalizeGameThemeOverride(row.theme_config),
   };
 }
 
@@ -107,6 +118,7 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
   const [mText, setMText] = useState(initialForm.maintenance_text);
   const [coverId, setCoverId] = useState(initialForm.cover_asset_id);
   const [coverUrl, setCoverUrl] = useState(initialForm.coverUrl);
+  const [themeConfig, setThemeConfig] = useState<GameThemeOverride>(initialForm.theme_config);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<GameForm | null>(null);
 
@@ -124,8 +136,9 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
       maintenance_text: mText,
       cover_asset_id: coverId,
       coverUrl,
+      theme_config: themeConfig,
     }),
-    [accent, coverId, coverUrl, ctaLabel, description, enabled, mText, mTitle, maintenance, sortOrder, title, visible],
+    [accent, coverId, coverUrl, ctaLabel, description, enabled, mText, mTitle, maintenance, sortOrder, themeConfig, title, visible],
   );
   const isDirty = !sameJson(currentForm, baseline);
 
@@ -142,6 +155,7 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
     setMText(form.maintenance_text);
     setCoverId(form.cover_asset_id);
     setCoverUrl(form.coverUrl);
+    setThemeConfig(form.theme_config);
     setBaseline(form);
     setPendingRemote(null);
   }, []);
@@ -198,6 +212,7 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
       maintenance_mode: maintenance,
       maintenance_title: maintenance ? mTitle : null,
       maintenance_text: maintenance ? mText : null,
+      theme_config: themeConfig,
     };
     const parsed = gameUpdateSchema.safeParse(input);
     if (!parsed.success) {
@@ -264,6 +279,82 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
             }}
           />
         </Field>
+
+        <div className="rounded-2xl border border-panel-border bg-surface/40 p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-ink">Tema propio del juego</p>
+              <p className="text-xs text-muted">Sobrescribe el tema global solo dentro de este juego.</p>
+            </div>
+            <Toggle
+              checked={themeConfig.enabled}
+              onChange={(checked) => setThemeConfig((prev) => ({ ...prev, enabled: checked }))}
+              label="Tema propio"
+            />
+          </div>
+
+          {themeConfig.enabled ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {THEME_FIELDS.slice(0, 6).map(({ key, label }) => (
+                <Field key={key} label={label}>
+                  <ColorField
+                    value={themeConfig.theme?.[key] ?? accent}
+                    onChange={(value) =>
+                      setThemeConfig((prev) => ({
+                        ...prev,
+                        theme: { ...prev.theme, [key]: value },
+                      }))
+                    }
+                  />
+                </Field>
+              ))}
+              <Field label="Acento de card">
+                <ColorField
+                  value={themeConfig.cardAccent ?? accent}
+                  onChange={(value) => setThemeConfig((prev) => ({ ...prev, cardAccent: value }))}
+                />
+              </Field>
+              <Field label="Fuente display">
+                <select
+                  className="h-10 w-full rounded-xl border border-panel-border bg-white px-3 text-sm"
+                  value={themeConfig.typography?.displayFont ?? ""}
+                  onChange={(event) =>
+                    setThemeConfig((prev) => ({
+                      ...prev,
+                      typography: { ...prev.typography, displayFont: event.target.value || undefined },
+                    }))
+                  }
+                >
+                  <option value="">Usar global</option>
+                  {CURATED_DISPLAY_FONTS.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Fuente cuerpo">
+                <select
+                  className="h-10 w-full rounded-xl border border-panel-border bg-white px-3 text-sm"
+                  value={themeConfig.typography?.bodyFont ?? ""}
+                  onChange={(event) =>
+                    setThemeConfig((prev) => ({
+                      ...prev,
+                      typography: { ...prev.typography, bodyFont: event.target.value || undefined },
+                    }))
+                  }
+                >
+                  <option value="">Usar global</option>
+                  {CURATED_BODY_FONTS.map((font) => (
+                    <option key={font} value={font}>
+                      {font}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          ) : null}
+        </div>
 
         <Advanced>
           <div className="grid gap-4 md:grid-cols-2">

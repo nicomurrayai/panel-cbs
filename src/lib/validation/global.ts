@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { hexColor } from "./common";
+import { homeChromeSchema, surfaceConfigSchema, typographySchema } from "./themeEngine";
 
 export const THEME_FIELDS = [
   { key: "surface", label: "Fondo" },
@@ -40,8 +41,14 @@ export const globalSettingsSchema = z.object({
   home_title: z.string().trim().max(160),
   home_subtitle: z.string().trim().max(200),
   home_background_asset_id: z.string().uuid().nullable(),
+  attract_media_asset_id: z.string().uuid().nullable(),
+  idle_timeout_seconds: z.number().int().min(10).max(600).nullable(),
+  auto_reset_seconds: z.number().int().min(15).max(900).nullable(),
   theme: themeSchema,
   branding: brandingSchema,
+  typography: typographySchema,
+  home_chrome: homeChromeSchema,
+  surface_config: surfaceConfigSchema,
 });
 
 export type GlobalSettingsInput = z.infer<typeof globalSettingsSchema>;

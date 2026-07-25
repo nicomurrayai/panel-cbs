@@ -105,7 +105,9 @@ export type Database = {
           branding: Json
           canvas_size: number
           created_at: string
+          attract_media_asset_id: string | null
           home_background_asset_id: string | null
+          home_chrome: Json
           home_eyebrow: string
           home_subtitle: string
           home_title: string
@@ -115,17 +117,21 @@ export type Database = {
           preload_asset_keys: string[]
           reduced_motion_default: boolean
           sound_config: Json
+          surface_config: Json
           theme: Json
+          typography: Json
           updated_at: string
           version: string
         }
         Insert: {
           animation_config?: Json
+          attract_media_asset_id?: string | null
           auto_reset_seconds?: number | null
           branding?: Json
           canvas_size?: number
           created_at?: string
           home_background_asset_id?: string | null
+          home_chrome?: Json
           home_eyebrow?: string
           home_subtitle?: string
           home_title?: string
@@ -135,17 +141,21 @@ export type Database = {
           preload_asset_keys?: string[]
           reduced_motion_default?: boolean
           sound_config?: Json
+          surface_config?: Json
           theme?: Json
+          typography?: Json
           updated_at?: string
           version: string
         }
         Update: {
           animation_config?: Json
+          attract_media_asset_id?: string | null
           auto_reset_seconds?: number | null
           branding?: Json
           canvas_size?: number
           created_at?: string
           home_background_asset_id?: string | null
+          home_chrome?: Json
           home_eyebrow?: string
           home_subtitle?: string
           home_title?: string
@@ -155,11 +165,20 @@ export type Database = {
           preload_asset_keys?: string[]
           reduced_motion_default?: boolean
           sound_config?: Json
+          surface_config?: Json
           theme?: Json
+          typography?: Json
           updated_at?: string
           version?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "global_settings_attract_media_asset_id_fkey"
+            columns: ["attract_media_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "global_settings_home_background_asset_id_fkey"
             columns: ["home_background_asset_id"]

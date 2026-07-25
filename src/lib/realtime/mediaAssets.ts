@@ -27,6 +27,10 @@ export function isVisibleImageAsset(row: Partial<MediaAssetRow>) {
   return row.kind === "image" && row.active !== false;
 }
 
+export function isVisibleVideoAsset(row: Partial<MediaAssetRow>) {
+  return row.kind === "video" && row.active !== false;
+}
+
 export async function fetchImageAssetRows() {
   const supabase = getBrowserClient();
   if (!supabase) {
@@ -37,6 +41,26 @@ export async function fetchImageAssetRows() {
     .from("media_assets")
     .select(MEDIA_ASSET_COLUMNS)
     .eq("kind", "image")
+    .eq("active", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as MediaAssetRow[];
+}
+
+export async function fetchVideoAssetRows() {
+  const supabase = getBrowserClient();
+  if (!supabase) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("media_assets")
+    .select(MEDIA_ASSET_COLUMNS)
+    .eq("kind", "video")
     .eq("active", true)
     .order("updated_at", { ascending: false });
 

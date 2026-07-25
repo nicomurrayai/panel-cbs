@@ -75,3 +75,10 @@ export function normalizeBranding(raw: unknown): BrandingConfig {
           : DEFAULT_BRANDING.logoAssetId,
   };
 }
+
+export {
+  normalizeTypography,
+  normalizeHomeChrome,
+  normalizeSurfaceConfig,
+  normalizeGameThemeOverride,
+} from "@/lib/theme/normalize";

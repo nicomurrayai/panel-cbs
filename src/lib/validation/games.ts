@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { hexColor } from "./common";
+import { gameThemeOverrideSchema } from "./themeEngine";
 
 export const gameUpdateSchema = z.object({
   title: z.string().trim().min(1, "El título es obligatorio").max(120),
@@ -13,6 +14,7 @@ export const gameUpdateSchema = z.object({
   maintenance_mode: z.boolean(),
   maintenance_title: z.string().trim().max(120).nullable(),
   maintenance_text: z.string().trim().max(600).nullable(),
+  theme_config: gameThemeOverrideSchema,
 });
 
 export type GameUpdateInput = z.infer<typeof gameUpdateSchema>;

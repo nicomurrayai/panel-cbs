@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAdminClient, STORAGE_BUCKET } from "@/lib/supabase/admin";
 import { assetUrl, buildStoragePath } from "@/lib/supabase/storage";
-import { validateImageFile } from "@/lib/validation/media";
+import { validateFontFile, validateImageFile, validateVideoFile } from "@/lib/validation/media";
 import { type ActionResult, ok, fail, toMessage } from "@/lib/actions";
 import type { MediaAssetView } from "@/types/panel";
 
@@ -100,6 +100,117 @@ export async function uploadImageAsset(
     }
 
     revalidatePath("/medios");
+    return ok(toView(data as AssetRow));
+  } catch (e) {
+    return fail(toMessage(e));
+  }
+}
+
+export async function listVideoAssets(): Promise<ActionResult<MediaAssetView[]>> {
+  try {
+    const supabase = getAdminClient();
+    const { data, error } = await supabase
+      .from("media_assets")
+      .select(ASSET_COLUMNS)
+      .eq("kind", "video")
+      .eq("active", true)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    return ok((data ?? []).map((r) => toView(r as AssetRow)));
+  } catch (e) {
+    return fail(toMessage(e));
+  }
+}
+
+export async function uploadVideoAsset(
+  formData: FormData,
+): Promise<ActionResult<MediaAssetView>> {
+  try {
+    const file = formData.get("file");
+    const alt = (formData.get("alt") as string | null) ?? "";
+    if (!(file instanceof File)) return fail("No se recibió ningún archivo.");
+
+    const validationError = validateVideoFile({ type: file.type, size: file.size });
+    if (validationError) return fail(validationError);
+
+    const supabase = getAdminClient();
+    const path = buildStoragePath(file.name);
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, buffer, { contentType: file.type, upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data, error } = await supabase
+      .from("media_assets")
+      .insert({
+        key: path,
+        kind: "video",
+        bucket: STORAGE_BUCKET,
+        path,
+        alt_text: alt,
+        mime_type: file.type,
+        active: true,
+      })
+      .select(ASSET_COLUMNS)
+      .single();
+
+    if (error) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+      throw error;
+    }
+
+    revalidatePath("/medios");
+    revalidatePath("/global");
+    return ok(toView(data as AssetRow));
+  } catch (e) {
+    return fail(toMessage(e));
+  }
+}
+
+export async function uploadFontAsset(
+  formData: FormData,
+): Promise<ActionResult<MediaAssetView>> {
+  try {
+    const file = formData.get("file");
+    const alt = (formData.get("alt") as string | null) ?? "";
+    if (!(file instanceof File)) return fail("No se recibió ningún archivo.");
+
+    const validationError = validateFontFile({ type: file.type, size: file.size, name: file.name });
+    if (validationError) return fail(validationError);
+
+    const supabase = getAdminClient();
+    const path = buildStoragePath(file.name);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const contentType = file.type || "font/woff2";
+
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, buffer, { contentType, upsert: false });
+    if (uploadError) throw uploadError;
+
+    const { data, error } = await supabase
+      .from("media_assets")
+      .insert({
+        key: path,
+        kind: "other",
+        bucket: STORAGE_BUCKET,
+        path,
+        alt_text: alt || file.name,
+        mime_type: contentType,
+        active: true,
+      })
+      .select(ASSET_COLUMNS)
+      .single();
+
+    if (error) {
+      await supabase.storage.from(STORAGE_BUCKET).remove([path]);
+      throw error;
+    }
+
+    revalidatePath("/medios");
+    revalidatePath("/global");
     return ok(toView(data as AssetRow));
   } catch (e) {
     return fail(toMessage(e));

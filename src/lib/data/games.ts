@@ -2,6 +2,9 @@ import "server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { assetUrl } from "@/lib/supabase/storage";
 
+import type { GameThemeOverride } from "@/lib/validation/themeEngine";
+import { normalizeGameThemeOverride } from "@/lib/theme";
+
 export type GameEditView = {
   id: string;
   name: string;
@@ -17,6 +20,7 @@ export type GameEditView = {
   accent_color: string | null;
   cover_asset_id: string | null;
   coverUrl: string | null;
+  theme_config: GameThemeOverride;
 };
 
 type CoverEmbed = {
@@ -31,7 +35,7 @@ export async function getGames(): Promise<GameEditView[]> {
   const { data, error } = await supabase
     .from("games")
     .select(
-      "id,name,title,description,cta_label,visible,enabled,maintenance_mode,maintenance_title,maintenance_text,sort_order,accent_color,cover_asset_id, cover:media_assets!games_cover_asset_id_fkey(public_url,bucket,path,fallback_src)",
+      "id,name,title,description,cta_label,visible,enabled,maintenance_mode,maintenance_title,maintenance_text,sort_order,accent_color,cover_asset_id,theme_config, cover:media_assets!games_cover_asset_id_fkey(public_url,bucket,path,fallback_src)",
     )
     .order("sort_order", { ascending: true });
 
@@ -54,6 +58,7 @@ export async function getGames(): Promise<GameEditView[]> {
       accent_color: row.accent_color,
       cover_asset_id: row.cover_asset_id,
       coverUrl: assetUrl(cover),
+      theme_config: normalizeGameThemeOverride(row.theme_config),
     } satisfies GameEditView;
   });
 }
