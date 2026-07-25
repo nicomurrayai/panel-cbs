@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { loadLeads, exportLeads } from "@/actions/leads";
-import type { LeadsPage } from "@/lib/data/leads";
+import { leadPayloadRecord, type LeadsPage } from "@/lib/data/leads";
+import type { LeadsFormConfig } from "@/lib/validation/leadsForm";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -22,7 +23,15 @@ function formatDate(value: string): string {
   });
 }
 
-export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize: number }) {
+export function LeadsTable({
+  initial,
+  pageSize,
+  formConfig,
+}: {
+  initial: LeadsPage;
+  pageSize: number;
+  formConfig: LeadsFormConfig;
+}) {
   const [rows, setRows] = useState(initial.rows);
   const [total, setTotal] = useState(initial.total);
   const [page, setPage] = useState(0);
@@ -30,11 +39,16 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // Refs para que Realtime y el debounce lean los valores vigentes sin re-suscribir.
   const pageRef = useRef(page);
   const searchRef = useRef(search);
   pageRef.current = page;
   searchRef.current = search;
+
+  const columns = useMemo(() => {
+    const configured = formConfig.fields.map((field) => ({ key: field.key, label: field.label }));
+    if (configured.length > 0) return configured;
+    return [{ key: "legajo", label: "Numero de Legajo" }];
+  }, [formConfig.fields]);
 
   const fetchPage = useCallback(
     async (nextPage: number, nextSearch: string) => {
@@ -51,7 +65,6 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
     [pageSize],
   );
 
-  // Busqueda con debounce: cada cambio reinicia a la primera pagina.
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
@@ -65,7 +78,6 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
     return () => clearTimeout(handle);
   }, [search, fetchPage]);
 
-  // Realtime: ante cualquier cambio en `leads`, refrescamos la pagina actual.
   const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleRefresh = useCallback(() => {
     if (realtimeTimer.current) {
@@ -96,16 +108,21 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
       toast.error(res.error);
       return;
     }
-    const data = (res.data ?? []).map((lead) => ({
-      "Numero de Legajo": lead.legajo,
-      "Fecha y hora de creacion": formatDate(lead.created_at),
-    }));
+    const data = (res.data ?? []).map((lead) => {
+      const payload = leadPayloadRecord(lead);
+      const row: Record<string, string> = {};
+      for (const column of columns) {
+        row[column.label] = payload[column.key] ?? "";
+      }
+      row["Fecha y hora de creacion"] = formatDate(lead.created_at);
+      return row;
+    });
     if (data.length === 0) {
       toast.error("No hay leads para exportar.");
       return;
     }
     const worksheet = XLSX.utils.json_to_sheet(data);
-    worksheet["!cols"] = [{ wch: 20 }, { wch: 24 }];
+    worksheet["!cols"] = [...columns.map(() => ({ wch: 20 })), { wch: 24 }];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
     const stamp = new Date().toISOString().slice(0, 10);
@@ -124,6 +141,7 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold text-ink">Registros</h2>
           <Badge tone="warning">{total} en total</Badge>
+          {!formConfig.enabled ? <Badge tone="neutral">Formulario desactivado</Badge> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -134,9 +152,9 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por legajo"
+              placeholder="Buscar en campos"
               className="w-56 pl-9"
-              aria-label="Buscar por numero de legajo"
+              aria-label="Buscar leads"
             />
           </div>
           <Button
@@ -156,29 +174,40 @@ export function LeadsTable({ initial, pageSize }: { initial: LeadsPage; pageSize
           <table className="w-full min-w-[28rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-panel-border text-left text-xs uppercase tracking-wide text-muted">
-                <th className="px-5 py-3 font-semibold">Numero de Legajo</th>
-                <th className="px-5 py-3 font-semibold">Fecha y hora de creacion</th>
+                {columns.map((column) => (
+                  <th key={column.key} className="px-5 py-3 font-semibold">
+                    {column.label}
+                  </th>
+                ))}
+                <th className="px-5 py-3 font-semibold">Fecha y hora</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="px-5 py-10 text-center text-muted">
+                  <td colSpan={columns.length + 1} className="px-5 py-10 text-center text-muted">
                     {search.trim()
                       ? "No hay leads que coincidan con la busqueda."
                       : "Todavia no hay leads registrados."}
                   </td>
                 </tr>
               ) : (
-                rows.map((lead) => (
-                  <tr
-                    key={lead.id}
-                    className="border-b border-panel-border/60 transition hover:bg-surface-strong/60"
-                  >
-                    <td className="px-5 py-3 font-semibold text-ink">{lead.legajo}</td>
-                    <td className="px-5 py-3 text-muted">{formatDate(lead.created_at)}</td>
-                  </tr>
-                ))
+                rows.map((lead) => {
+                  const payload = leadPayloadRecord(lead);
+                  return (
+                    <tr
+                      key={lead.id}
+                      className="border-b border-panel-border/60 transition hover:bg-surface-strong/60"
+                    >
+                      {columns.map((column) => (
+                        <td key={column.key} className="px-5 py-3 font-semibold text-ink">
+                          {payload[column.key] ?? "—"}
+                        </td>
+                      ))}
+                      <td className="px-5 py-3 text-muted">{formatDate(lead.created_at)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

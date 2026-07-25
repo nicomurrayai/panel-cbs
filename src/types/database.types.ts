@@ -113,6 +113,7 @@ export type Database = {
           home_title: string
           id: string
           idle_timeout_seconds: number | null
+          leads_form: Json
           max_canvas_dpr: number
           preload_asset_keys: string[]
           reduced_motion_default: boolean
@@ -137,6 +138,7 @@ export type Database = {
           home_title?: string
           id?: string
           idle_timeout_seconds?: number | null
+          leads_form?: Json
           max_canvas_dpr?: number
           preload_asset_keys?: string[]
           reduced_motion_default?: boolean
@@ -161,6 +163,7 @@ export type Database = {
           home_title?: string
           id?: string
           idle_timeout_seconds?: number | null
+          leads_form?: Json
           max_canvas_dpr?: number
           preload_asset_keys?: string[]
           reduced_motion_default?: boolean
@@ -194,18 +197,21 @@ export type Database = {
           game_id: string | null
           id: string
           legajo: string
+          payload: Json
         }
         Insert: {
           created_at?: string
           game_id?: string | null
           id?: string
-          legajo: string
+          legajo?: string
+          payload?: Json
         }
         Update: {
           created_at?: string
           game_id?: string | null
           id?: string
           legajo?: string
+          payload?: Json
         }
         Relationships: [
           {
