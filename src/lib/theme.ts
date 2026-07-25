@@ -1,6 +1,6 @@
 import type { BrandingConfig, ThemeConfig } from "@/lib/validation/global";
 
-/** Defaults neutros — mantener alineados con panel-juegos/src/lib/theme.ts. */
+/** Defaults B&N — mantener alineados con panel-juegos/src/lib/theme.ts. */
 export const DEFAULT_THEME: ThemeConfig = {
   surface: "#fafafa",
   surfaceStrong: "#ffffff",
@@ -10,8 +10,8 @@ export const DEFAULT_THEME: ThemeConfig = {
   ink: "#171717",
   muted: "#737373",
   inverse: "#0a0a0a",
-  success: "#3f6f5a",
-  danger: "#c44545",
+  success: "#404040",
+  danger: "#737373",
 };
 
 export const DEFAULT_BRANDING: BrandingConfig = {
