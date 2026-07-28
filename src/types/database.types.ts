@@ -435,36 +435,45 @@ export type Database = {
         Row: {
           active: boolean
           correct_answer: boolean
+          correct_option_index: number | null
           created_at: string
           game_id: string
           id: string
           image_alt: string
           image_asset_id: string | null
+          options: string[] | null
           question: string
+          question_type: string
           sort_order: number
           updated_at: string
         }
         Insert: {
           active?: boolean
           correct_answer?: boolean
+          correct_option_index?: number | null
           created_at?: string
           game_id: string
           id?: string
           image_alt?: string
           image_asset_id?: string | null
+          options?: string[] | null
           question: string
+          question_type?: string
           sort_order?: number
           updated_at?: string
         }
         Update: {
           active?: boolean
           correct_answer?: boolean
+          correct_option_index?: number | null
           created_at?: string
           game_id?: string
           id?: string
           image_alt?: string
           image_asset_id?: string | null
+          options?: string[] | null
           question?: string
+          question_type?: string
           sort_order?: number
           updated_at?: string
         }

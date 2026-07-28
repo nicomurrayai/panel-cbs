@@ -19,7 +19,7 @@ export default async function QuizPage() {
     <>
       <PageIntro
         title="Quiz"
-        description="Configura preguntas con enunciado, imagen opcional y una respuesta Verdadero o Falso."
+        description="Configura preguntas con enunciado, imagen opcional y modalidad Verdadero/Falso u opcion multiple."
       />
       {error || !config ? <SetupNotice error={error ?? "Sin datos"} /> : <QuizEditor config={config} />}
     </>

@@ -33,16 +33,23 @@ export async function saveQuizConfig(input: unknown): Promise<ActionResult> {
     }
 
     if (questions.length > 0) {
-      const rows = questions.map((question, index) => ({
-        id: question.id,
-        game_id: "quiz",
-        question: question.question,
-        image_asset_id: question.image_asset_id,
-        image_alt: question.image_alt,
-        correct_answer: question.correct,
-        active: question.active,
-        sort_order: index,
-      }));
+      const rows = questions.map((question, index) => {
+        const isMultipleChoice = question.type === "multiple_choice";
+
+        return {
+          id: question.id,
+          game_id: "quiz",
+          question: question.question,
+          image_asset_id: question.image_asset_id,
+          image_alt: question.image_alt,
+          question_type: question.type,
+          correct_answer: question.correct,
+          options: isMultipleChoice ? question.options : null,
+          correct_option_index: isMultipleChoice ? question.correct_option_index : null,
+          active: question.active,
+          sort_order: index,
+        };
+      });
 
       const { error } = await supabase.from("quiz_questions").upsert(rows);
       if (error) {

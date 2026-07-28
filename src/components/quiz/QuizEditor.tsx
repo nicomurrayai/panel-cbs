@@ -4,11 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { QuizConfigView } from "@/lib/data/quiz";
-import { quizConfigSchema } from "@/lib/validation/quiz";
+import { quizConfigSchema, type QuizQuestionType } from "@/lib/validation/quiz";
 import { saveQuizConfig } from "@/actions/quiz";
 import { Card, CardBody, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Textarea } from "@/components/ui/Input";
+import { Input, Textarea } from "@/components/ui/Input";
 import { Field } from "@/components/ui/Field";
 import { Toggle } from "@/components/ui/Toggle";
 import { DirectImageUpload } from "@/components/media/DirectImageUpload";
@@ -30,7 +30,10 @@ type QuestionForm = {
   image_asset_id: string | null;
   imageUrl: string | null;
   image_alt: string;
+  type: QuizQuestionType;
   correct: boolean;
+  options: [string, string, string] | null;
+  correct_option_index: 0 | 1 | 2 | null;
   active: boolean;
   sort_order: number;
 };
@@ -38,6 +41,44 @@ type QuestionForm = {
 type QuizForm = {
   questions: QuestionForm[];
 };
+
+const EMPTY_OPTIONS: [string, string, string] = ["", "", ""];
+
+function normalizeQuestionType(value: string | null | undefined): QuizQuestionType {
+  return value === "multiple_choice" ? "multiple_choice" : "true_false";
+}
+
+function normalizeOptions(options: string[] | null): [string, string, string] | null {
+  if (!options || options.length !== 3) {
+    return null;
+  }
+
+  return [options[0] ?? "", options[1] ?? "", options[2] ?? ""];
+}
+
+function normalizeCorrectOptionIndex(value: number | null): 0 | 1 | 2 | null {
+  if (value === 0 || value === 1 || value === 2) {
+    return value;
+  }
+
+  return null;
+}
+
+function createEmptyQuestion(sortOrder: number): QuestionForm {
+  return {
+    id: crypto.randomUUID(),
+    question: "",
+    image_asset_id: null,
+    imageUrl: null,
+    image_alt: "",
+    type: "true_false",
+    correct: true,
+    options: null,
+    correct_option_index: null,
+    active: true,
+    sort_order: sortOrder,
+  };
+}
 
 function sortQuestions(questions: QuestionForm[]) {
   return [...questions].sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
@@ -51,13 +92,18 @@ function formFromConfig(config: QuizConfigView): QuizForm {
 
 async function questionFromRow(row: QuizQuestionRow): Promise<QuestionForm> {
   const image = await fetchMediaAssetById(row.image_asset_id);
+  const type = normalizeQuestionType(row.question_type);
+
   return {
     id: row.id,
     question: row.question,
     image_asset_id: row.image_asset_id,
     imageUrl: assetUrl(image),
     image_alt: row.image_alt,
+    type,
     correct: row.correct_answer,
+    options: type === "multiple_choice" ? normalizeOptions(row.options) : null,
+    correct_option_index: type === "multiple_choice" ? normalizeCorrectOptionIndex(row.correct_option_index) : null,
     active: row.active,
     sort_order: row.sort_order,
   };
@@ -81,6 +127,24 @@ async function fetchQuizForm(): Promise<QuizForm | null> {
 
   const questions = await Promise.all(((data ?? []) as QuizQuestionRow[]).map(questionFromRow));
   return { questions: sortQuestions(questions) };
+}
+
+function modalityPatch(type: QuizQuestionType): Pick<QuestionForm, "type" | "correct" | "options" | "correct_option_index"> {
+  if (type === "true_false") {
+    return {
+      type,
+      correct: true,
+      options: null,
+      correct_option_index: null,
+    };
+  }
+
+  return {
+    type,
+    correct: true,
+    options: [...EMPTY_OPTIONS],
+    correct_option_index: 0,
+  };
 }
 
 export function QuizEditor({ config }: { config: QuizConfigView }) {
@@ -177,6 +241,26 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
     setQuestions((current) => current.map((question) => (question.id === id ? { ...question, ...patch } : question)));
   }
 
+  function setQuestionType(id: string, type: QuizQuestionType) {
+    setQuestions((current) =>
+      current.map((question) => (question.id === id ? { ...question, ...modalityPatch(type) } : question)),
+    );
+  }
+
+  function updateOption(id: string, optionIndex: 0 | 1 | 2, value: string) {
+    setQuestions((current) =>
+      current.map((question) => {
+        if (question.id !== id) {
+          return question;
+        }
+
+        const options = [...(question.options ?? EMPTY_OPTIONS)] as [string, string, string];
+        options[optionIndex] = value;
+        return { ...question, options };
+      }),
+    );
+  }
+
   function buildInput() {
     return {
       questions: questions.map((question) => ({
@@ -184,7 +268,10 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
         question: question.question,
         image_asset_id: question.image_asset_id,
         image_alt: question.image_alt,
+        type: question.type,
         correct: question.correct,
+        options: question.type === "multiple_choice" ? question.options : null,
+        correct_option_index: question.type === "multiple_choice" ? question.correct_option_index : null,
         active: question.active,
       })),
     };
@@ -242,26 +329,12 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
       <Card>
         <CardHeader
           title="Preguntas"
-          description="Cada pregunta incluye enunciado, imagen opcional y una respuesta Verdadero/Falso."
+          description="Cada pregunta puede ser Verdadero/Falso u opcion multiple con tres respuestas."
           actions={
             <Button
               variant="secondary"
               size="sm"
-              onClick={() =>
-                setQuestions((current) => [
-                  ...current,
-                  {
-                    id: crypto.randomUUID(),
-                    question: "",
-                    image_asset_id: null,
-                    imageUrl: null,
-                    image_alt: "",
-                    correct: true,
-                    active: true,
-                    sort_order: current.length,
-                  },
-                ])
-              }
+              onClick={() => setQuestions((current) => [...current, createEmptyQuestion(current.length)])}
             >
               <Plus size={15} /> Agregar pregunta
             </Button>
@@ -291,12 +364,45 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                   </div>
                 </div>
 
+                <Field label="Modalidad">
+                  <div className="flex gap-2">
+                    {(
+                      [
+                        { value: "true_false" as const, label: "Verdadero o falso" },
+                        { value: "multiple_choice" as const, label: "Opcion multiple" },
+                      ] as const
+                    ).map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => {
+                          if (question.type !== value) {
+                            setQuestionType(question.id, value);
+                          }
+                        }}
+                        className={cn(
+                          "flex h-10 flex-1 items-center justify-center rounded-xl border px-2 text-center text-xs font-semibold transition",
+                          question.type === value
+                            ? "border-accent bg-accent/12 text-accent"
+                            : "border-panel-border bg-white text-muted hover:bg-surface-strong",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
                 <Field label="Pregunta" required={question.active}>
                   <Textarea
                     value={question.question}
                     onChange={(event) => updateQuestion(question.id, { question: event.target.value })}
                     rows={2}
-                    placeholder="Escribe la afirmacion a evaluar..."
+                    placeholder={
+                      question.type === "multiple_choice"
+                        ? "Escribe la pregunta..."
+                        : "Escribe la afirmacion a evaluar..."
+                    }
                   />
                 </Field>
 
@@ -309,30 +415,66 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                   />
                 </Field>
 
-                <Field label="Respuesta correcta">
-                  <div className="flex gap-2">
-                    {([
-                      { value: true, label: "Verdadero", icon: Check },
-                      { value: false, label: "Falso", icon: X },
-                    ] as const).map(({ value, label, icon: Icon }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => updateQuestion(question.id, { correct: value })}
-                        className={cn(
-                          "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition",
-                          question.correct === value
-                            ? value
-                              ? "border-success bg-success/12 text-success"
-                              : "border-danger bg-danger/12 text-danger"
-                            : "border-panel-border bg-white text-muted hover:bg-surface-strong",
-                        )}
-                      >
-                        <Icon size={15} /> {label}
-                      </button>
-                    ))}
-                  </div>
-                </Field>
+                {question.type === "true_false" ? (
+                  <Field label="Respuesta correcta">
+                    <div className="flex gap-2">
+                      {([
+                        { value: true, label: "Verdadero", icon: Check },
+                        { value: false, label: "Falso", icon: X },
+                      ] as const).map(({ value, label, icon: Icon }) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => updateQuestion(question.id, { correct: value })}
+                          className={cn(
+                            "flex h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition",
+                            question.correct === value
+                              ? value
+                                ? "border-success bg-success/12 text-success"
+                                : "border-danger bg-danger/12 text-danger"
+                              : "border-panel-border bg-white text-muted hover:bg-surface-strong",
+                          )}
+                        >
+                          <Icon size={15} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                ) : (
+                  <Field label="Respuestas" required={question.active}>
+                    <div className="space-y-2">
+                      {([0, 1, 2] as const).map((optionIndex) => {
+                        const isCorrect = question.correct_option_index === optionIndex;
+
+                        return (
+                          <div key={optionIndex} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateQuestion(question.id, { correct_option_index: optionIndex })}
+                              className={cn(
+                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition",
+                                isCorrect
+                                  ? "border-success bg-success/12 text-success"
+                                  : "border-panel-border bg-white text-muted hover:bg-surface-strong",
+                              )}
+                              aria-label={`Marcar respuesta ${optionIndex + 1} como correcta`}
+                              title="Marcar como correcta"
+                            >
+                              <Check size={15} />
+                            </button>
+                            <Input
+                              value={question.options?.[optionIndex] ?? ""}
+                              onChange={(event) => updateOption(question.id, optionIndex, event.target.value)}
+                              placeholder={`Respuesta ${optionIndex + 1}`}
+                              aria-label={`Respuesta ${optionIndex + 1}`}
+                            />
+                          </div>
+                        );
+                      })}
+                      <p className="text-xs text-muted">Marca con el check cual es la respuesta correcta.</p>
+                    </div>
+                  </Field>
+                )}
               </div>
             ))}
           </div>
