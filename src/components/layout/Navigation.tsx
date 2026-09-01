@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Brain,
   Dices,
+  Disc3,
   HelpCircle,
   Link2,
   Palette,
@@ -17,6 +18,7 @@ import { cn } from "@/lib/cn";
 export const NAV_LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/global", label: "Tema", icon: Palette },
   { href: "/juegos", label: "Juegos", icon: Dices },
+  { href: "/ruleta", label: "Ruleta", icon: Disc3 },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/quiz", label: "Quiz", icon: HelpCircle },
   { href: "/match", label: "Relacionar", icon: Link2 },
