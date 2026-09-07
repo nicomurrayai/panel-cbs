@@ -87,6 +87,7 @@ descripción y la **imagen de portada**.
 
 ### Memory Card
 - Definí el **tiempo límite** (10–600 segundos) y las **cartas** del juego.
+- Subí una imagen única para personalizar el **reverso de todas las cartas**.
 - Cada carta es un par: subí una imagen desde el panel. El juego duplica cada
   carta automáticamente para formar los pares.
 - No se puede guardar una carta activa sin imagen.

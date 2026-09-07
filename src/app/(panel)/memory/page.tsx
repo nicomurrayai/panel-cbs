@@ -19,7 +19,7 @@ export default async function MemoryPage() {
     <>
       <PageIntro
         title="Memory Card"
-        description="Configura el tiempo maximo y la galeria de imagenes que el totem duplica para formar pares."
+        description="Configura el tiempo, el reverso y la galeria de imagenes que el totem duplica para formar pares."
       />
       {error || !config ? <SetupNotice error={error ?? "Sin datos"} /> : <MemoryEditor config={config} />}
     </>

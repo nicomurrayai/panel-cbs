@@ -375,24 +375,34 @@ export type Database = {
       }
       memory_settings: {
         Row: {
+          back_asset_id: string | null
           game_id: string
           player_mode: string
           time_limit_seconds: number
           updated_at: string
         }
         Insert: {
+          back_asset_id?: string | null
           game_id: string
           player_mode?: string
           time_limit_seconds?: number
           updated_at?: string
         }
         Update: {
+          back_asset_id?: string | null
           game_id?: string
           player_mode?: string
           time_limit_seconds?: number
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "memory_settings_back_asset_id_fkey"
+            columns: ["back_asset_id"]
+            isOneToOne: false
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "memory_settings_game_id_fkey"
             columns: ["game_id"]

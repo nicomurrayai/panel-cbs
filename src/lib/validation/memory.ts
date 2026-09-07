@@ -11,6 +11,7 @@ export const memoryCardSchema = z.object({
 export const memoryConfigSchema = z.object({
   time_limit_seconds: z.coerce.number().int().min(10).max(600),
   player_mode: memoryPlayerModeSchema,
+  back_asset_id: z.string().uuid().nullable(),
   cards: z.array(memoryCardSchema),
 });
 

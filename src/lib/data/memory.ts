@@ -14,12 +14,16 @@ export type MemoryCardView = {
 export type MemoryConfigView = {
   time_limit_seconds: number;
   player_mode: MemoryPlayerMode;
+  back_asset_id: string | null;
+  backAssetUrl: string | null;
   cards: MemoryCardView[];
 };
 
 const DEFAULT_CONFIG: MemoryConfigView = {
   time_limit_seconds: 60,
   player_mode: "one",
+  back_asset_id: null,
+  backAssetUrl: null,
   cards: [],
 };
 
@@ -33,7 +37,9 @@ export async function getMemoryConfig(): Promise<MemoryConfigView> {
   const [settingsRes, cardsRes] = await Promise.all([
     supabase
       .from("memory_settings")
-      .select("time_limit_seconds,player_mode")
+      .select(
+        "time_limit_seconds,player_mode,back_asset_id, back:media_assets!memory_settings_back_asset_id_fkey(public_url,bucket,path,fallback_src)",
+      )
       .eq("game_id", "memory")
       .maybeSingle(),
     supabase
@@ -53,9 +59,21 @@ export async function getMemoryConfig(): Promise<MemoryConfigView> {
     throw cardsRes.error;
   }
 
+  const backAsset = settingsRes.data
+    ? one(
+        (
+          settingsRes.data as typeof settingsRes.data & {
+            back: Parameters<typeof assetUrl>[0] | Parameters<typeof assetUrl>[0][];
+          }
+        ).back,
+      )
+    : null;
+
   return {
     time_limit_seconds: settingsRes.data?.time_limit_seconds ?? DEFAULT_CONFIG.time_limit_seconds,
     player_mode: normalizePlayerMode(settingsRes.data?.player_mode),
+    back_asset_id: settingsRes.data?.back_asset_id ?? DEFAULT_CONFIG.back_asset_id,
+    backAssetUrl: assetUrl(backAsset),
     cards: (cardsRes.data ?? []).map((row) => {
       const asset = one(
         (row as { asset: Parameters<typeof assetUrl>[0] | Parameters<typeof assetUrl>[0][] }).asset,

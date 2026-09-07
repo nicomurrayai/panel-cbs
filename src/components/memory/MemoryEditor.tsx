@@ -40,6 +40,8 @@ type CardForm = {
 type MemoryForm = {
   time_limit_seconds: string;
   player_mode: MemoryPlayerMode;
+  back_asset_id: string | null;
+  backAssetUrl: string | null;
   cards: CardForm[];
 };
 
@@ -51,6 +53,8 @@ function formFromConfig(config: MemoryConfigView): MemoryForm {
   return {
     time_limit_seconds: String(config.time_limit_seconds),
     player_mode: config.player_mode,
+    back_asset_id: config.back_asset_id,
+    backAssetUrl: config.backAssetUrl,
     cards: config.cards.map((card, index) => ({ ...card, sort_order: index })),
   };
 }
@@ -82,10 +86,14 @@ async function fetchMemoryForm(): Promise<MemoryForm | null> {
 
   const cards = await Promise.all(((cardsRes.data ?? []) as MemoryCardRow[]).map(cardFromRow));
   const playerMode = settingsRes.data?.player_mode;
+  const backAssetId = settingsRes.data?.back_asset_id ?? null;
+  const backAsset = await fetchMediaAssetById(backAssetId);
   return {
     time_limit_seconds: String(settingsRes.data?.time_limit_seconds ?? 60),
     player_mode:
       playerMode === "two" || playerMode === "selectable" || playerMode === "one" ? playerMode : "one",
+    back_asset_id: backAssetId,
+    backAssetUrl: assetUrl(backAsset),
     cards: sortCards(cards),
   };
 }
@@ -95,19 +103,29 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState(initialForm.time_limit_seconds);
   const [playerMode, setPlayerMode] = useState<MemoryPlayerMode>(initialForm.player_mode);
+  const [backAssetId, setBackAssetId] = useState(initialForm.back_asset_id);
+  const [backAssetUrl, setBackAssetUrl] = useState(initialForm.backAssetUrl);
   const [cards, setCards] = useState<CardForm[]>(initialForm.cards.map((card) => ({ ...card })));
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<MemoryForm | null>(null);
 
   const currentForm = useMemo<MemoryForm>(
-    () => ({ time_limit_seconds: timeLimitSeconds, player_mode: playerMode, cards }),
-    [cards, playerMode, timeLimitSeconds],
+    () => ({
+      time_limit_seconds: timeLimitSeconds,
+      player_mode: playerMode,
+      back_asset_id: backAssetId,
+      backAssetUrl,
+      cards,
+    }),
+    [backAssetId, backAssetUrl, cards, playerMode, timeLimitSeconds],
   );
   const isDirty = !sameJson(currentForm, baseline);
 
   const applyForm = useCallback((form: MemoryForm) => {
     setTimeLimitSeconds(form.time_limit_seconds);
     setPlayerMode(form.player_mode);
+    setBackAssetId(form.back_asset_id);
+    setBackAssetUrl(form.backAssetUrl);
     setCards(sortCards(form.cards).map((card) => ({ ...card })));
     setBaseline(form);
     setPendingRemote(null);
@@ -146,14 +164,19 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
       if (table === "memory_settings") {
         const row = (payload as RealtimePayload<MemorySettingsRow>).new;
         if (payload.eventType !== "DELETE" && row.game_id === "memory") {
-          const mode = row.player_mode;
-          const next = {
-            ...currentForm,
-            time_limit_seconds: String(row.time_limit_seconds),
-            player_mode:
-              mode === "two" || mode === "selectable" || mode === "one" ? mode : currentForm.player_mode,
-          };
-          applyForm(next);
+          const nextBackAssetId = row.back_asset_id ?? null;
+          void fetchMediaAssetById(nextBackAssetId).then((backAsset) => {
+            const mode = row.player_mode;
+            const next = {
+              ...currentForm,
+              time_limit_seconds: String(row.time_limit_seconds),
+              player_mode:
+                mode === "two" || mode === "selectable" || mode === "one" ? mode : currentForm.player_mode,
+              back_asset_id: nextBackAssetId,
+              backAssetUrl: assetUrl(backAsset),
+            };
+            applyForm(next);
+          });
         }
         return;
       }
@@ -190,7 +213,17 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
           ? { ...card, assetUrl: mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow) }
           : card,
       );
-      applyForm({ ...currentForm, cards: nextCards });
+      const isBackAsset = currentForm.back_asset_id === row.id;
+      applyForm({
+        ...currentForm,
+        backAssetUrl:
+          isBackAsset
+            ? mediaPayload.eventType === "DELETE"
+              ? null
+              : assetUrl(mediaPayload.new as MediaAssetRow)
+            : currentForm.backAssetUrl,
+        cards: nextCards,
+      });
     },
     onReconnect: async () => {
       const form = await fetchMemoryForm();
@@ -221,6 +254,7 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
     return {
       time_limit_seconds: Number(timeLimitSeconds) || 0,
       player_mode: playerMode,
+      back_asset_id: backAssetId,
       cards: cards.map((card) => ({
         id: card.id,
         asset_id: card.asset_id,
@@ -288,6 +322,23 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
                   </button>
                 );
               })}
+            </div>
+          </Field>
+
+          <Field label="Reverso de las cartas">
+            <div className="rounded-2xl border border-panel-border bg-surface/30 p-3">
+              <DirectImageUpload
+                label="Reverso de las cartas"
+                value={backAssetId}
+                valueUrl={backAssetUrl}
+                onChange={(id, url) => {
+                  setBackAssetId(id);
+                  setBackAssetUrl(url);
+                }}
+              />
+              <p className="mt-2 text-xs text-muted">
+                Se mostrara en todas las cartas ocultas. Sin imagen, el totem usara el diseño actual.
+              </p>
             </div>
           </Field>
         </CardBody>
