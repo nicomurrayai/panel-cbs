@@ -453,7 +453,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
       <Card>
         <CardHeader
           title="Segmentos y premios"
-          description="La probabilidad de cada premio se calcula a partir de su peso."
+          description="Configurá la probabilidad y los colores de cada segmento. Los premios también pueden tener una imagen."
           actions={
             <Button variant="secondary" size="sm" onClick={addSegment}>
               <Plus size={15} /> Agregar segmento
@@ -512,6 +512,14 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   </div>
                 </div>
 
+                <div
+                  className="mb-3 flex min-h-12 items-center justify-center rounded-xl border border-panel-border px-4 py-2 text-center text-sm font-bold"
+                  style={{ background: segment.color, color: segment.text_color }}
+                  aria-label={`Vista previa del segmento ${segment.label || index + 1}`}
+                >
+                  {segment.label.trim() || `Segmento ${index + 1}`}
+                </div>
+
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label="Tipo">
                     <Select
@@ -533,7 +541,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                       onChange={(event) => updateSegment(segment.id, { probability_weight: event.target.value })}
                     />
                   </Field>
-                  <Field label="Color">
+                  <Field label="Color del segmento">
                     <ColorField value={segment.color} onChange={(value) => updateSegment(segment.id, { color: value })} />
                   </Field>
                   <Field label="Color del texto">
@@ -541,15 +549,17 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   </Field>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <Field label="Imagen del premio">
-                    <ImagePicker
-                      label={`Imagen - ${segment.label || "segmento"}`}
-                      value={segment.asset_id}
-                      valueUrl={segment.assetUrl}
-                      onChange={(id, url) => updateSegment(segment.id, { asset_id: id, assetUrl: url })}
-                    />
-                  </Field>
+                <div className={`mt-3 grid gap-3 ${segment.prize_type === "prize" ? "md:grid-cols-2" : ""}`}>
+                  {segment.prize_type === "prize" ? (
+                    <Field label="Imagen del premio" hint="Se muestra al finalizar el giro, no dentro de la ruleta.">
+                      <ImagePicker
+                        label={`Imagen - ${segment.label || "segmento"}`}
+                        value={segment.asset_id}
+                        valueUrl={segment.assetUrl}
+                        onChange={(id, url) => updateSegment(segment.id, { asset_id: id, assetUrl: url })}
+                      />
+                    </Field>
+                  ) : null}
                   <div className="space-y-3">
                     <Field label="Titulo del resultado">
                       <Input value={segment.result_title} onChange={(event) => updateSegment(segment.id, { result_title: event.target.value })} />
