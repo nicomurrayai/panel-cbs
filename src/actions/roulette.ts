@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { rouletteConfigSchema } from "@/lib/validation/roulette";
 import { type ActionResult, ok, fail, toMessage } from "@/lib/actions";
+import { normalizeGameThemeOverride } from "@/lib/theme";
 
 export async function saveRouletteConfig(
   input: unknown,
@@ -13,17 +14,37 @@ export async function saveRouletteConfig(
     return fail(parsed.error.issues[0]?.message ?? "Configuración inválida.");
   }
 
-  const { settings, segments } = parsed.data;
+  const { background_asset_id, settings, segments } = parsed.data;
   const supabase = getAdminClient();
 
   try {
-    // 1) Ajustes generales de la ruleta.
+    // 1) Fondo propio del juego, conservando el resto del tema configurado.
+    const { data: game, error: gameReadError } = await supabase
+      .from("games")
+      .select("theme_config")
+      .eq("id", "roulette")
+      .single();
+    if (gameReadError) throw gameReadError;
+
+    const themeConfig = normalizeGameThemeOverride(game.theme_config);
+    const { error: gameUpdateError } = await supabase
+      .from("games")
+      .update({
+        theme_config: {
+          ...themeConfig,
+          backgroundAssetId: background_asset_id,
+        },
+      })
+      .eq("id", "roulette");
+    if (gameUpdateError) throw gameUpdateError;
+
+    // 2) Ajustes generales de la ruleta.
     const { error: settingsError } = await supabase
       .from("roulette_settings")
       .upsert({ game_id: "roulette", ...settings });
     if (settingsError) throw settingsError;
 
-    // 2) Borrar segmentos que ya no están en la lista.
+    // 3) Borrar segmentos que ya no están en la lista.
     const { data: existing } = await supabase
       .from("roulette_segments")
       .select("id")
@@ -40,7 +61,7 @@ export async function saveRouletteConfig(
       if (error) throw error;
     }
 
-    // 3) Crear/actualizar segmentos (sort_order según el orden enviado).
+    // 4) Crear/actualizar segmentos (sort_order según el orden enviado).
     const rows = segments.map((s, idx) => ({
       id: s.id,
       game_id: "roulette",
@@ -61,7 +82,7 @@ export async function saveRouletteConfig(
       .upsert(rows);
     if (upsertError) throw upsertError;
 
-    // 4) Inventario por segmento.
+    // 5) Inventario por segmento.
     for (const s of segments) {
       if (s.stock_managed && s.total_stock != null) {
         const { data: inv } = await supabase

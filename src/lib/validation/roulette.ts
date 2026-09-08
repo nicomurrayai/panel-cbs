@@ -38,6 +38,7 @@ export const rouletteSettingsSchema = z.object({
 
 export const rouletteConfigSchema = z
   .object({
+    background_asset_id: z.string().uuid().nullable(),
     settings: rouletteSettingsSchema,
     segments: z.array(rouletteSegmentSchema).min(1, "Agregá al menos un segmento."),
   })

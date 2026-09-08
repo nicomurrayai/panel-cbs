@@ -2,6 +2,7 @@ import "server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { assetUrl } from "@/lib/supabase/storage";
 import { one } from "@/lib/embed";
+import { normalizeGameThemeOverride } from "@/lib/theme";
 
 export type RouletteSegmentView = {
   id: string;
@@ -34,6 +35,8 @@ export type RouletteSettingsView = {
 };
 
 export type RouletteConfigView = {
+  background_asset_id: string | null;
+  backgroundUrl: string | null;
   settings: RouletteSettingsView;
   segments: RouletteSegmentView[];
 };
@@ -53,7 +56,7 @@ const DEFAULT_SETTINGS: RouletteSettingsView = {
 export async function getRouletteConfig(): Promise<RouletteConfigView> {
   const supabase = getAdminClient();
 
-  const [settingsRes, segmentsRes] = await Promise.all([
+  const [settingsRes, segmentsRes, gameRes] = await Promise.all([
     supabase
       .from("roulette_settings")
       .select(
@@ -68,9 +71,27 @@ export async function getRouletteConfig(): Promise<RouletteConfigView> {
       )
       .eq("game_id", "roulette")
       .order("sort_order", { ascending: true }),
+    supabase
+      .from("games")
+      .select("theme_config")
+      .eq("id", "roulette")
+      .maybeSingle(),
   ]);
 
+  if (settingsRes.error) throw settingsRes.error;
   if (segmentsRes.error) throw segmentsRes.error;
+  if (gameRes.error) throw gameRes.error;
+
+  const gameTheme = normalizeGameThemeOverride(gameRes.data?.theme_config);
+  const backgroundAssetId = gameTheme.backgroundAssetId ?? null;
+  const backgroundRes = backgroundAssetId
+    ? await supabase
+        .from("media_assets")
+        .select("public_url,bucket,path,fallback_src")
+        .eq("id", backgroundAssetId)
+        .maybeSingle()
+    : null;
+  if (backgroundRes?.error) throw backgroundRes.error;
 
   const settings = settingsRes.data
     ? { ...DEFAULT_SETTINGS, ...settingsRes.data }
@@ -103,5 +124,10 @@ export async function getRouletteConfig(): Promise<RouletteConfigView> {
     };
   });
 
-  return { settings, segments };
+  return {
+    background_asset_id: backgroundAssetId,
+    backgroundUrl: assetUrl(backgroundRes?.data ?? null),
+    settings,
+    segments,
+  };
 }

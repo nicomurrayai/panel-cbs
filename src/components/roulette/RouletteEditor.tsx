@@ -27,6 +27,7 @@ import type { Database } from "@/types/database.types";
 type RouletteSettingsRow = Database["public"]["Tables"]["roulette_settings"]["Row"];
 type RouletteSegmentRow = Database["public"]["Tables"]["roulette_segments"]["Row"];
 type RouletteInventoryRow = Database["public"]["Tables"]["roulette_prize_inventory"]["Row"];
+type GameRow = Database["public"]["Tables"]["games"]["Row"];
 
 type SettingsForm = {
   instruction_title: string;
@@ -59,6 +60,8 @@ type SegForm = {
 };
 
 type RouletteForm = {
+  background_asset_id: string | null;
+  backgroundUrl: string | null;
   settings: SettingsForm;
   segments: SegForm[];
 };
@@ -158,15 +161,24 @@ async function fetchRouletteForm(): Promise<RouletteForm | null> {
     return null;
   }
 
-  const [settingsRes, segmentsRes, inventoryRes] = await Promise.all([
+  const [settingsRes, segmentsRes, inventoryRes, gameRes] = await Promise.all([
     supabase.from("roulette_settings").select("*").eq("game_id", "roulette").maybeSingle(),
     supabase.from("roulette_segments").select("*").eq("game_id", "roulette").order("sort_order", { ascending: true }),
     supabase.from("roulette_prize_inventory").select("*"),
+    supabase.from("games").select("*").eq("id", "roulette").maybeSingle(),
   ]);
 
   if (settingsRes.error) throw settingsRes.error;
   if (segmentsRes.error) throw segmentsRes.error;
   if (inventoryRes.error) throw inventoryRes.error;
+  if (gameRes.error) throw gameRes.error;
+
+  const game = gameRes.data as GameRow | null;
+  const themeConfig = game?.theme_config && typeof game.theme_config === "object" && !Array.isArray(game.theme_config)
+    ? game.theme_config as Record<string, unknown>
+    : {};
+  const backgroundAssetId = typeof themeConfig.backgroundAssetId === "string" ? themeConfig.backgroundAssetId : null;
+  const background = await fetchMediaAssetById(backgroundAssetId);
 
   const inventoryBySegment = new Map((inventoryRes.data ?? []).map((row) => [row.segment_id, row as RouletteInventoryRow]));
   const segments = await Promise.all(
@@ -174,6 +186,8 @@ async function fetchRouletteForm(): Promise<RouletteForm | null> {
   );
 
   return {
+    background_asset_id: backgroundAssetId,
+    backgroundUrl: assetUrl(background),
     settings: settingsFromRow((settingsRes.data as RouletteSettingsRow | null) ?? null),
     segments: sortSegments(segments),
   };
@@ -181,6 +195,8 @@ async function fetchRouletteForm(): Promise<RouletteForm | null> {
 
 function formFromConfig(config: RouletteConfigView): RouletteForm {
   return {
+    background_asset_id: config.background_asset_id,
+    backgroundUrl: config.backgroundUrl,
     settings: settingsFromView(config),
     segments: config.segments.map(toForm),
   };
@@ -189,15 +205,22 @@ function formFromConfig(config: RouletteConfigView): RouletteForm {
 export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
+  const [backgroundAssetId, setBackgroundAssetId] = useState(initialForm.background_asset_id);
+  const [backgroundUrl, setBackgroundUrl] = useState(initialForm.backgroundUrl);
   const [settings, setSettings] = useState(initialForm.settings);
   const [segments, setSegments] = useState<SegForm[]>(initialForm.segments);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<RouletteForm | null>(null);
 
-  const currentForm = useMemo<RouletteForm>(() => ({ settings, segments }), [segments, settings]);
+  const currentForm = useMemo<RouletteForm>(
+    () => ({ background_asset_id: backgroundAssetId, backgroundUrl, settings, segments }),
+    [backgroundAssetId, backgroundUrl, segments, settings],
+  );
   const isDirty = !sameJson(currentForm, baseline);
 
   const applyForm = useCallback((form: RouletteForm) => {
+    setBackgroundAssetId(form.background_asset_id);
+    setBackgroundUrl(form.backgroundUrl);
     setSettings(form.settings);
     setSegments(sortSegments(form.segments).map((segment) => ({ ...segment })));
     setBaseline(form);
@@ -227,7 +250,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
 
   useSupabaseRealtime({
     channelName: "panel-cbs-roulette",
-    tables: ["roulette_settings", "roulette_segments", "roulette_prize_inventory", "media_assets"],
+    tables: ["games", "roulette_settings", "roulette_segments", "roulette_prize_inventory", "media_assets"],
     onChange: (table, payload) => {
       if (isDirty) {
         void queueRemoteSnapshot();
@@ -238,6 +261,16 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         const row = (payload as RealtimePayload<RouletteSettingsRow>).new;
         if (payload.eventType !== "DELETE" && row.game_id === "roulette") {
           applyForm({ ...currentForm, settings: settingsFromRow(row as RouletteSettingsRow) });
+        }
+        return;
+      }
+
+      if (table === "games") {
+        const row = (payload as RealtimePayload<GameRow>).new;
+        if (payload.eventType !== "DELETE" && row.id === "roulette") {
+          void fetchRouletteForm().then((form) => {
+            if (form) handleRemoteForm(form);
+          });
         }
         return;
       }
@@ -312,10 +345,26 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
 
       const nextSegments = currentForm.segments.map((segment) =>
         segment.asset_id === row.id
-          ? { ...segment, assetUrl: mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow) }
+          ? {
+              ...segment,
+              asset_id: mediaPayload.eventType === "DELETE" ? null : segment.asset_id,
+              assetUrl: mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow),
+            }
           : segment,
       );
-      applyForm({ ...currentForm, segments: nextSegments });
+      const backgroundChanged = currentForm.background_asset_id === row.id;
+      const nextBackgroundAssetId = backgroundChanged && mediaPayload.eventType === "DELETE"
+        ? null
+        : currentForm.background_asset_id;
+      const nextBackgroundUrl = backgroundChanged
+        ? mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow)
+        : currentForm.backgroundUrl;
+      applyForm({
+        ...currentForm,
+        background_asset_id: nextBackgroundAssetId,
+        backgroundUrl: nextBackgroundUrl,
+        segments: nextSegments,
+      });
     },
     onReconnect: async () => {
       const form = await fetchRouletteForm();
@@ -376,6 +425,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
 
   function buildInput() {
     return {
+      background_asset_id: backgroundAssetId,
       settings: {
         ...settings,
         duration_ms: Number(settings.duration_ms) || 0,
@@ -404,7 +454,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   const validation = useMemo(
     () => rouletteConfigSchema.safeParse(buildInput()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [segments, settings],
+    [backgroundAssetId, segments, settings],
   );
 
   function save() {
@@ -452,8 +502,28 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
 
       <Card>
         <CardHeader
+          title="Fondo del juego"
+          description="Esta imagen cubre la pantalla de Ruleta. Se recorta automáticamente para adaptarse al dispositivo."
+        />
+        <CardBody>
+          <Field label="Imagen de fondo de Ruleta">
+            <ImagePicker
+              label="Fondo de Ruleta"
+              value={backgroundAssetId}
+              valueUrl={backgroundUrl}
+              onChange={(id, url) => {
+                setBackgroundAssetId(id);
+                setBackgroundUrl(url);
+              }}
+            />
+          </Field>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
           title="Segmentos y premios"
-          description="Configurá la probabilidad y los colores de cada segmento. Los premios también pueden tener una imagen."
+          description="Configurá la probabilidad, los colores y la imagen de cada segmento."
           actions={
             <Button variant="secondary" size="sm" onClick={addSegment}>
               <Plus size={15} /> Agregar segmento
@@ -517,7 +587,11 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   style={{ background: segment.color, color: segment.text_color }}
                   aria-label={`Vista previa del segmento ${segment.label || index + 1}`}
                 >
-                  {segment.label.trim() || `Segmento ${index + 1}`}
+                  {segment.assetUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={segment.assetUrl} alt="" className="mr-3 h-10 w-10 shrink-0 object-contain" />
+                  ) : null}
+                  <span>{segment.label.trim() || `Segmento ${index + 1}`}</span>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -549,17 +623,15 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   </Field>
                 </div>
 
-                <div className={`mt-3 grid gap-3 ${segment.prize_type === "prize" ? "md:grid-cols-2" : ""}`}>
-                  {segment.prize_type === "prize" ? (
-                    <Field label="Imagen del premio" hint="Se muestra al finalizar el giro, no dentro de la ruleta.">
-                      <ImagePicker
-                        label={`Imagen - ${segment.label || "segmento"}`}
-                        value={segment.asset_id}
-                        valueUrl={segment.assetUrl}
-                        onChange={(id, url) => updateSegment(segment.id, { asset_id: id, assetUrl: url })}
-                      />
-                    </Field>
-                  ) : null}
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <Field label="Imagen del segmento" hint="Se muestra dentro de esta porción de la ruleta.">
+                    <ImagePicker
+                      label={`Imagen - ${segment.label || "segmento"}`}
+                      value={segment.asset_id}
+                      valueUrl={segment.assetUrl}
+                      onChange={(id, url) => updateSegment(segment.id, { asset_id: id, assetUrl: url })}
+                    />
+                  </Field>
                   <div className="space-y-3">
                     <Field label="Titulo del resultado">
                       <Input value={segment.result_title} onChange={(event) => updateSegment(segment.id, { result_title: event.target.value })} />
