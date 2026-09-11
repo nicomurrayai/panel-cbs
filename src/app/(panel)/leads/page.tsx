@@ -3,6 +3,7 @@ import { PageIntro } from "@/components/ui/PageIntro";
 import { SetupNotice } from "@/components/SetupNotice";
 import { LeadsTable } from "@/components/leads/LeadsTable";
 import { LeadsFormEditor } from "@/components/leads/LeadsFormEditor";
+import { LeadsWorkspace } from "@/components/leads/LeadsWorkspace";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +25,15 @@ export default async function LeadsPage() {
     <>
       <PageIntro
         title="Leads"
-        description="Configurá el formulario del tótem (hasta 5 campos) y revisá los registros en tiempo real."
+        description="Revisá los registros capturados o ajustá por separado el formulario que ve cada visitante."
       />
       {error || !initial || !formConfig ? (
         <SetupNotice error={error ?? "Sin datos"} />
       ) : (
-        <div className="space-y-5">
-          <LeadsFormEditor initial={formConfig} />
-          <LeadsTable initial={initial} pageSize={LEADS_PAGE_SIZE} formConfig={formConfig} />
-        </div>
+        <LeadsWorkspace
+          records={<LeadsTable initial={initial} pageSize={LEADS_PAGE_SIZE} formConfig={formConfig} />}
+          form={<LeadsFormEditor initial={formConfig} />}
+        />
       )}
     </>
   );

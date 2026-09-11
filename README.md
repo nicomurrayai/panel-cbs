@@ -36,6 +36,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET` | Bucket de imágenes (`game-assets`) | — |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | Usuario y contraseña del panel | Lo elegís vos |
 | `SESSION_SECRET` | Secreto para firmar la sesión (≥32 caracteres) | Generalo (ver abajo) |
+| `NEXT_PUBLIC_TOTEM_PREVIEW_URL` | URL pública de `panel-juegos` para la preview real | `http://localhost:5173` en desarrollo |
 
 Generar un `SESSION_SECRET` seguro:
 
@@ -68,14 +69,10 @@ Todas las secciones avisan si la configuración es **válida** (verde) o tiene u
 **problema** (rojo). Si está en rojo, el botón **Guardar** queda deshabilitado:
 así una mala configuración nunca llega a los juegos.
 
-### Dashboard
-Resumen de juegos visibles/ocultos, contadores y el **estado de conexión** con
-Supabase (verde = conectado).
-
 ### Juegos
-Mostrá u ocultá cada juego en la pantalla principal con el interruptor
-**"Mostrar en la home"**. También podés editar el título, el texto del botón, la
-descripción y la **imagen de portada**.
+La entrada principal resume las experiencias y su estado. El botón **Configurar**
+abre un workspace con secciones de contenido, diseño y reglas, más una preview
+real 9:16 que refleja el borrador sin guardarlo automáticamente.
 
 ### Ruleta
 - Cada **segmento** es un premio. Definí su **nombre**, **tipo**
@@ -97,11 +94,11 @@ descripción y la **imagen de portada**.
   correcta y subí una imagen de referencia.
 - No se puede activar una pregunta sin enunciado ni sin imagen.
 
-### Ajustes globales
+### Apariencia
 Textos de la pantalla principal, nombres de marca e imagen de fondo, y la
 **paleta de colores** del tema.
 
-### Medios
+### Recursos
 Biblioteca de imágenes del bucket `game-assets`: **subir**, **reemplazar**
 (mantiene el vínculo con donde se usa) y **eliminar**. Formatos: PNG, JPG, WEBP,
 SVG (máx. 8 MB).

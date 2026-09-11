@@ -41,8 +41,12 @@ export function LeadsTable({
 
   const pageRef = useRef(page);
   const searchRef = useRef(search);
-  pageRef.current = page;
-  searchRef.current = search;
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+  useEffect(() => {
+    searchRef.current = search;
+  }, [search]);
 
   const columns = useMemo(() => {
     const configured = formConfig.fields.map((field) => ({ key: field.key, label: field.label }));

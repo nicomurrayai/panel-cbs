@@ -5,25 +5,25 @@
    Themables vía global_settings.theme en el tótem; chrome del admin usa estos defaults.
 ---------------------------------------------------------------------------- */
 @theme {
-  --color-surface: #fafafa;
+  --color-surface: #f4f3ef;
   --color-surface-strong: #ffffff;
-  --color-accent: #171717;
-  --color-accent-deep: #0a0a0a;
-  --color-highlight: #525252;
-  --color-ink: #171717;
-  --color-muted: #737373;
-  --color-inverse: #0a0a0a;
-  --color-success: #3f6f5a;
-  --color-danger: #c44545;
-  --color-panel-border: rgba(23, 23, 23, 0.12);
+  --color-accent: #22221f;
+  --color-accent-deep: #11110f;
+  --color-highlight: #696962;
+  --color-ink: #20201d;
+  --color-muted: #707069;
+  --color-inverse: #11110f;
+  --color-success: #357155;
+  --color-danger: #b9473f;
+  --color-panel-border: rgba(32, 32, 29, 0.13);
 
   --font-sans: var(--font-geist-sans), "Segoe UI Variable", "Segoe UI", system-ui,
     sans-serif;
 
-  --shadow-soft: 0 1.4rem 3.4rem rgba(23, 23, 23, 0.1);
-  --shadow-tight: 0 0.8rem 1.8rem rgba(23, 23, 23, 0.1);
+  --shadow-soft: 0 1rem 2.8rem rgba(32, 32, 29, 0.07);
+  --shadow-tight: 0 0.35rem 1.2rem rgba(32, 32, 29, 0.08);
 
-  --radius-xl: 1.25rem;
+  --radius-xl: 1rem;
 }
 
 html,
@@ -35,10 +35,102 @@ body {
   background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: rgba(32, 32, 29, 0.16);
+}
+
+.admin-page {
+  animation: admin-page-in 220ms ease-out both;
+}
+
+.editor-workspace {
+  display: grid;
+  gap: 24px;
+}
+
+.editor-workspace__preview {
+  min-width: 0;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 4px;
+  border: 1px solid var(--color-panel-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.workspace-tab {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.workspace-tab:hover {
+  color: var(--color-ink);
+}
+
+.workspace-tab[aria-selected="true"] {
+  background: #fff;
+  color: var(--color-ink);
+  box-shadow: 0 1px 3px rgba(32, 32, 29, 0.1);
+}
+
+@media (min-width: 1280px) {
+  .editor-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    align-items: start;
+  }
+
+  .editor-workspace__preview {
+    position: sticky;
+    top: 88px;
+  }
+}
+
+@keyframes admin-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Scrollbar discreto y consistente */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(23, 23, 23, 0.28) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

@@ -163,10 +163,10 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
           </CardBody>
         </Card>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {items.map((asset) => (
-            <Card key={asset.id} className="overflow-hidden">
-              <div className="grid aspect-video place-items-center overflow-hidden bg-surface">
+            <Card key={asset.id} className="group relative overflow-hidden">
+              <div className="grid aspect-[4/3] place-items-center overflow-hidden bg-surface">
                 {asset.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={asset.url} alt={asset.alt} className="h-full w-full object-contain" />
@@ -182,7 +182,7 @@ export function MediaLibrary({ assets }: { assets: MediaAssetView[] }) {
                   {asset.width && asset.height ? `${asset.width}x${asset.height}` : "-"}
                   {asset.mimeType ? ` - ${asset.mimeType.replace("image/", "")}` : ""}
                 </p>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 transition sm:absolute sm:inset-x-2 sm:bottom-2 sm:rounded-lg sm:bg-white/95 sm:p-2 sm:opacity-0 sm:shadow-tight sm:backdrop-blur sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                   <Button
                     variant="secondary"
                     size="sm"

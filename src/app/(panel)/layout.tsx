@@ -24,12 +24,12 @@ export default async function PanelLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-surface">
       <Sidebar primaryName={primaryName} secondaryName={secondaryName} logoUrl={logoUrl} />
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="min-w-0 flex min-h-screen flex-1 flex-col">
         <Topbar />
         <MobileNav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 lg:px-8">
+        <main className="admin-page mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
           {children}
         </main>
       </div>

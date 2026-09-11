@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MatchConfigView } from "@/lib/data/match";
 import { matchConfigSchema } from "@/lib/validation/match";
@@ -20,6 +20,7 @@ import { assetUrl } from "@/lib/supabase/publicStorage";
 import { sameJson } from "@/lib/realtime/compare";
 import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
 import type { Database } from "@/types/database.types";
+import { useGameWorkspace } from "@/components/games/GameWorkspace";
 
 type MatchPairRow = Database["public"]["Tables"]["match_pairs"]["Row"];
 
@@ -79,9 +80,11 @@ async function fetchMatchForm(): Promise<MatchForm | null> {
 }
 
 export function MatchEditor({ config }: { config: MatchConfigView }) {
+  const { activeTab, updatePreview, updateEditorState } = useGameWorkspace();
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [pairs, setPairs] = useState<PairForm[]>(initialForm.pairs);
+  const [expandedPairId, setExpandedPairId] = useState<string | null>(initialForm.pairs[0]?.id ?? null);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<MatchForm | null>(null);
 
@@ -189,6 +192,26 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
     [pairs],
   );
 
+  useEffect(() => {
+    updatePreview({
+      matchItems: pairs
+        .filter((pair) => pair.active)
+        .map((pair) => ({
+          id: pair.id,
+          imageId: pair.image_asset_id ?? pair.id,
+          text: pair.text,
+          image: pair.imageUrl ?? "",
+          imageAlt: "Imagen para relacionar",
+          sortOrder: pair.sort_order,
+        })),
+    });
+  }, [pairs, updatePreview]);
+
+  useEffect(
+    () => updateEditorState({ dirty: isDirty, valid: validation.success }),
+    [isDirty, updateEditorState, validation.success],
+  );
+
   function save() {
     const parsed = matchConfigSchema.safeParse(buildInput());
     if (!parsed.success) {
@@ -204,6 +227,8 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
       },
     });
   }
+
+  if (activeTab !== "pairs") return null;
 
   return (
     <div className="space-y-5">
@@ -261,11 +286,20 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
         <CardBody>
           {pairs.length === 0 ? <p className="py-6 text-center text-sm text-muted">No hay pares. Agrega el primero.</p> : null}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {pairs.map((pair, index) => (
-              <div key={pair.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-4">
+              <div key={pair.id} className="flex flex-col gap-3 rounded-xl border border-panel-border bg-surface/30 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-muted">#{index + 1}</span>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-semibold text-ink"
+                    onClick={() => setExpandedPairId((current) => current === pair.id ? null : pair.id)}
+                    aria-expanded={expandedPairId === pair.id}
+                  >
+                    <ChevronDown size={16} className={expandedPairId === pair.id ? "rotate-180" : undefined} />
+                    <span>Par {index + 1}</span>
+                    <span className="truncate text-xs font-normal text-muted">{pair.text || "Sin oración"}</span>
+                  </button>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                       Activa
@@ -282,7 +316,7 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
                   </div>
                 </div>
 
-                <Field label="Oracion" required={pair.active}>
+                {expandedPairId === pair.id ? <><Field label="Oracion" required={pair.active}>
                   <Textarea
                     value={pair.text}
                     onChange={(event) => updatePair(pair.id, { text: event.target.value })}
@@ -299,6 +333,7 @@ export function MatchEditor({ config }: { config: MatchConfigView }) {
                     onChange={(id, url) => updatePair(pair.id, { image_asset_id: id, imageUrl: url })}
                   />
                 </Field>
+                </> : null}
               </div>
             ))}
           </div>

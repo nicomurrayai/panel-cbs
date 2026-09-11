@@ -8,14 +8,11 @@ import { THEME_FIELDS, globalSettingsSchema, type BrandingConfig, type ThemeConf
 import {
   CURATED_BODY_FONTS,
   CURATED_DISPLAY_FONTS,
-  DEFAULT_HOME_CHROME,
-  DEFAULT_TYPOGRAPHY,
   type HomeChromeConfig,
   type SurfaceConfig,
   type TypographyConfig,
 } from "@/lib/validation/themeEngine";
 import {
-  DEFAULT_BRANDING,
   DEFAULT_THEME,
   normalizeBranding,
   normalizeHomeChrome,
@@ -35,19 +32,20 @@ import { ColorField } from "@/components/forms/ColorField";
 import { ImagePicker } from "@/components/media/ImagePicker";
 import { VideoPicker } from "@/components/media/VideoPicker";
 import { PendingRemoteChange } from "@/components/realtime/PendingRemoteChange";
-import { TotemPreviewFrame, type PreviewMode } from "@/components/theme/TotemPreviewFrame";
+import { LiveTotemPreview, type PreviewScreen } from "@/components/preview/LiveTotemPreview";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useSupabaseRealtime, type RealtimePayload } from "@/hooks/useSupabaseRealtime";
 import { getBrowserClient } from "@/lib/supabase/browser";
 import { assetUrl } from "@/lib/supabase/publicStorage";
 import { sameJson } from "@/lib/realtime/compare";
-import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
+import { fetchMediaAssetById } from "@/lib/realtime/mediaAssets";
 import type { Database } from "@/types/database.types";
 import { cn } from "@/lib/cn";
 
 type GlobalSettingsRow = Database["public"]["Tables"]["global_settings"]["Row"];
 
 type StudioTab = "palette" | "typography" | "home" | "cards" | "resources";
+type PreviewMode = Extract<PreviewScreen, "home" | "attract">;
 
 type GlobalForm = {
   home_eyebrow: string;
@@ -69,35 +67,11 @@ type GlobalForm = {
 };
 
 const TABS: Array<{ id: StudioTab; label: string }> = [
-  { id: "palette", label: "Paleta" },
+  { id: "resources", label: "Identidad" },
+  { id: "home", label: "Inicio / Attract" },
+  { id: "palette", label: "Tema" },
   { id: "typography", label: "Tipografía" },
-  { id: "home", label: "Home / Attract" },
-  { id: "cards", label: "Cards / CTA" },
-  { id: "resources", label: "Recursos" },
-];
-
-const PREVIEW_GAMES = [
-  {
-    id: "roulette",
-    title: "Ruleta de Premios",
-    description: "Girá una vez y descubrí tu premio al instante.",
-    cta: "Jugar",
-    accent: null as string | null,
-  },
-  {
-    id: "memory",
-    title: "Memory Card",
-    description: "Encontrá los pares antes de que termine el tiempo.",
-    cta: "Jugar",
-    accent: null,
-  },
-  {
-    id: "quiz",
-    title: "Quiz Test",
-    description: "Respondé verdadero o falso y avanzá.",
-    cta: "Responder",
-    accent: null,
-  },
+  { id: "cards", label: "Componentes" },
 ];
 
 function formFromSettings(settings: GlobalSettingsView): GlobalForm {
@@ -194,14 +168,13 @@ function SelectField({
 export function ThemeStudio({ settings }: { settings: GlobalSettingsView }) {
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromSettings(settings), [settings]);
-  const [tab, setTab] = useState<StudioTab>("palette");
+  const [tab, setTab] = useState<StudioTab>("resources");
   const [previewMode, setPreviewMode] = useState<PreviewMode>("home");
   const [form, setForm] = useState<GlobalForm>(initialForm);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<GlobalForm | null>(null);
 
   const isDirty = !sameJson(form, baseline);
-  const attractIsVideo = form.surface_config.attractMediaKind === "video";
 
   const applyForm = useCallback((next: GlobalForm) => {
     setForm(next);
@@ -306,18 +279,19 @@ export function ThemeStudio({ settings }: { settings: GlobalSettingsView }) {
         </CardBody>
       </Card>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-1 rounded-2xl border border-panel-border bg-surface/50 p-1">
+          <div className="workspace-tabs" role="tablist" aria-label="Secciones de apariencia">
             {TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
                 className={cn(
-                  "rounded-xl px-3 py-2 text-sm font-semibold transition",
-                  tab === item.id ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink",
+                  "workspace-tab",
                 )}
+                aria-selected={tab === item.id}
+                role="tab"
               >
                 {item.label}
               </button>
@@ -672,16 +646,12 @@ export function ThemeStudio({ settings }: { settings: GlobalSettingsView }) {
           ) : null}
         </div>
 
-        <aside className="xl:sticky xl:top-4 xl:self-start">
-          <Card>
-            <CardHeader title="Vista previa tótem" description="Simulación vertical 9:16." />
-            <CardBody className="space-y-3">
-              <div className="flex flex-wrap gap-1">
+        <aside className="space-y-3 xl:sticky xl:top-20 xl:self-start">
+              <div className="workspace-tabs" role="tablist" aria-label="Pantalla de preview">
                 {(
                   [
                     ["home", "Home"],
                     ["attract", "Attract"],
-                    ["cards", "Cards"],
                   ] as Array<[PreviewMode, string]>
                 ).map(([id, label]) => (
                   <button
@@ -689,31 +659,42 @@ export function ThemeStudio({ settings }: { settings: GlobalSettingsView }) {
                     type="button"
                     onClick={() => setPreviewMode(id)}
                     className={cn(
-                      "rounded-lg px-2.5 py-1 text-xs font-semibold",
-                      previewMode === id ? "bg-ink text-white" : "bg-surface text-muted",
+                      "workspace-tab flex-1",
                     )}
+                    aria-selected={previewMode === id}
+                    role="tab"
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <TotemPreviewFrame
-                mode={previewMode === "cards" ? "home" : previewMode}
-                theme={form.theme}
-                branding={{ ...DEFAULT_BRANDING, ...form.branding }}
-                typography={form.typography ?? DEFAULT_TYPOGRAPHY}
-                homeChrome={form.home_chrome ?? DEFAULT_HOME_CHROME}
-                logoUrl={form.logoUrl}
-                backgroundUrl={form.backgroundUrl}
-                attractMediaUrl={form.attractMediaUrl}
-                attractIsVideo={attractIsVideo}
-                title={form.home_title}
-                subtitle={form.home_subtitle}
-                eyebrow={form.home_eyebrow}
-                games={PREVIEW_GAMES}
+              <LiveTotemPreview
+                title="Preview · Apariencia"
+                payload={{
+                  screen: previewMode,
+                  config: {
+                    theme: form.theme,
+                    typography: form.typography,
+                    homeChrome: form.home_chrome,
+                    branding: { ...form.branding, logoUrl: form.logoUrl },
+                    surface: {
+                      ...form.surface_config,
+                      patternUrl: form.patternUrl,
+                      attractMediaUrl: form.attractMediaUrl,
+                    },
+                    home: {
+                      eyebrow: form.home_eyebrow,
+                      title: form.home_title,
+                      subtitle: form.home_subtitle,
+                      backgroundImageSrc: form.backgroundUrl ?? "",
+                      attractMediaUrl: form.attractMediaUrl,
+                      attractMediaKind: form.surface_config.attractMediaKind,
+                      idleTimeoutSeconds: form.idle_timeout_seconds ?? 45,
+                      autoResetSeconds: form.auto_reset_seconds ?? 90,
+                    },
+                  },
+                }}
               />
-            </CardBody>
-          </Card>
         </aside>
       </div>
 

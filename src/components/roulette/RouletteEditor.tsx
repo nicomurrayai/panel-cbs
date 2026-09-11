@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { RouletteConfigView, RouletteSegmentView } from "@/lib/data/roulette";
@@ -23,6 +23,7 @@ import { assetUrl } from "@/lib/supabase/publicStorage";
 import { sameJson } from "@/lib/realtime/compare";
 import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
 import type { Database } from "@/types/database.types";
+import { useGameWorkspace } from "@/components/games/GameWorkspace";
 
 type RouletteSettingsRow = Database["public"]["Tables"]["roulette_settings"]["Row"];
 type RouletteSegmentRow = Database["public"]["Tables"]["roulette_segments"]["Row"];
@@ -203,12 +204,14 @@ function formFromConfig(config: RouletteConfigView): RouletteForm {
 }
 
 export function RouletteEditor({ config }: { config: RouletteConfigView }) {
+  const { activeTab, updatePreview, updateEditorState } = useGameWorkspace();
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [backgroundAssetId, setBackgroundAssetId] = useState(initialForm.background_asset_id);
   const [backgroundUrl, setBackgroundUrl] = useState(initialForm.backgroundUrl);
   const [settings, setSettings] = useState(initialForm.settings);
   const [segments, setSegments] = useState<SegForm[]>(initialForm.segments);
+  const [expandedSegmentId, setExpandedSegmentId] = useState<string | null>(initialForm.segments[0]?.id ?? null);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<RouletteForm | null>(null);
 
@@ -387,10 +390,12 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
   }
 
   function addSegment() {
+    const id = crypto.randomUUID();
+    setExpandedSegmentId(id);
     setSegments((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id,
         label: "",
         prize_type: "prize",
         probability_weight: "1",
@@ -457,6 +462,44 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
     [backgroundAssetId, segments, settings],
   );
 
+  useEffect(() => {
+    updatePreview({
+      config: {
+        games: { roulette: { themeOverride: { backgroundUrl } } },
+        roulette: {
+          instructionTitle: settings.instruction_title,
+          instructionText: settings.instruction_text,
+          spinLabel: settings.spin_label,
+          winnerTitle: settings.winner_title,
+          thanksTitle: settings.thanks_title,
+          offlineTitle: settings.offline_title,
+          offlineText: settings.offline_text,
+          durationMs: Number(settings.duration_ms) || 3800,
+          minTurns: Number(settings.min_turns) || 5,
+          segments: segments.map((segment) => ({
+            id: segment.id,
+            label: segment.label,
+            prizeType: segment.prize_type,
+            probabilityWeight: Number(segment.probability_weight) || 0,
+            stockManaged: segment.stock_managed,
+            color: segment.color,
+            textColor: segment.text_color,
+            imageSrc: segment.assetUrl,
+            resultTitle: segment.result_title || null,
+            resultText: segment.result_text || null,
+            enabled: segment.enabled,
+            sortOrder: segment.sort_order,
+          })),
+        },
+      },
+    });
+  }, [backgroundUrl, segments, settings, updatePreview]);
+
+  useEffect(
+    () => updateEditorState({ dirty: isDirty, valid: validation.success }),
+    [isDirty, updateEditorState, validation.success],
+  );
+
   function save() {
     const parsed = rouletteConfigSchema.safeParse(buildInput());
     if (!parsed.success) {
@@ -500,7 +543,46 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         </CardBody>
       </Card>
 
-      <Card>
+      {activeTab === "general" ? (
+        <Card>
+          <CardHeader title="Textos y comportamiento" description="Mensajes visibles y ritmo del giro." />
+          <CardBody className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Título de instrucciones">
+                <Input value={settings.instruction_title} onChange={(event) => setSettings((value) => ({ ...value, instruction_title: event.target.value }))} />
+              </Field>
+              <Field label="Botón para girar">
+                <Input value={settings.spin_label} onChange={(event) => setSettings((value) => ({ ...value, spin_label: event.target.value }))} />
+              </Field>
+            </div>
+            <Field label="Instrucciones">
+              <Input value={settings.instruction_text} onChange={(event) => setSettings((value) => ({ ...value, instruction_text: event.target.value }))} />
+            </Field>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Título cuando gana">
+                <Input value={settings.winner_title} onChange={(event) => setSettings((value) => ({ ...value, winner_title: event.target.value }))} />
+              </Field>
+              <Field label="Título sin premio">
+                <Input value={settings.thanks_title} onChange={(event) => setSettings((value) => ({ ...value, thanks_title: event.target.value }))} />
+              </Field>
+              <Field label="Título sin conexión">
+                <Input value={settings.offline_title} onChange={(event) => setSettings((value) => ({ ...value, offline_title: event.target.value }))} />
+              </Field>
+              <Field label="Mensaje sin conexión">
+                <Input value={settings.offline_text} onChange={(event) => setSettings((value) => ({ ...value, offline_text: event.target.value }))} />
+              </Field>
+              <Field label="Duración del giro (ms)">
+                <Input type="number" min={1000} value={settings.duration_ms} onChange={(event) => setSettings((value) => ({ ...value, duration_ms: event.target.value }))} />
+              </Field>
+              <Field label="Vueltas mínimas">
+                <Input type="number" min={1} value={settings.min_turns} onChange={(event) => setSettings((value) => ({ ...value, min_turns: event.target.value }))} />
+              </Field>
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
+
+      <Card className={activeTab === "design" ? undefined : "hidden"}>
         <CardHeader
           title="Fondo del juego"
           description="Esta imagen cubre la pantalla de Ruleta. Se recorta automáticamente para adaptarse al dispositivo."
@@ -520,14 +602,14 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className={activeTab === "prizes" || activeTab === "probability" ? undefined : "hidden"}>
         <CardHeader
-          title="Segmentos y premios"
-          description="Configurá la probabilidad, los colores y la imagen de cada segmento."
+          title={activeTab === "probability" ? "Probabilidad y stock" : "Premios"}
+          description={activeTab === "probability" ? "Ajustá el peso relativo y la disponibilidad de cada premio." : "Definí nombres, tipos, colores, imágenes y mensajes de resultado."}
           actions={
-            <Button variant="secondary" size="sm" onClick={addSegment}>
+            activeTab === "prizes" ? <Button variant="secondary" size="sm" onClick={addSegment}>
               <Plus size={15} /> Agregar segmento
-            </Button>
+            </Button> : null
           }
         />
         <CardBody className="space-y-4">
@@ -552,6 +634,15 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   />
                   <Badge tone={segment.enabled ? "success" : "neutral"}>{pct}%</Badge>
                   <Toggle checked={segment.enabled} onChange={(value) => updateSegment(segment.id, { enabled: value })} label="Habilitado" />
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSegmentId((current) => current === segment.id ? null : segment.id)}
+                    className="rounded-lg p-1.5 text-muted hover:bg-black/5"
+                    aria-label={expandedSegmentId === segment.id ? "Contraer segmento" : "Editar segmento"}
+                    aria-expanded={expandedSegmentId === segment.id}
+                  >
+                    <ChevronDown size={16} className={expandedSegmentId === segment.id ? "rotate-180" : undefined} />
+                  </button>
                   <div className="flex items-center">
                     <button
                       type="button"
@@ -582,7 +673,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   </div>
                 </div>
 
-                <div
+                {expandedSegmentId === segment.id ? <><div
                   className="mb-3 flex min-h-12 items-center justify-center rounded-xl border border-panel-border px-4 py-2 text-center text-sm font-bold"
                   style={{ background: segment.color, color: segment.text_color }}
                   aria-label={`Vista previa del segmento ${segment.label || index + 1}`}
@@ -595,7 +686,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Field label="Tipo">
+                  <Field label="Tipo" className={activeTab === "prizes" ? undefined : "hidden"}>
                     <Select
                       value={segment.prize_type}
                       onChange={(event) => updateSegment(segment.id, { prize_type: event.target.value as SegForm["prize_type"] })}
@@ -607,7 +698,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="Peso (probabilidad)">
+                  <Field label="Peso (probabilidad)" className={activeTab === "probability" ? undefined : "hidden"}>
                     <Input
                       type="number"
                       min={0}
@@ -615,15 +706,15 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                       onChange={(event) => updateSegment(segment.id, { probability_weight: event.target.value })}
                     />
                   </Field>
-                  <Field label="Color del segmento">
+                  <Field label="Color del segmento" className={activeTab === "prizes" ? undefined : "hidden"}>
                     <ColorField value={segment.color} onChange={(value) => updateSegment(segment.id, { color: value })} />
                   </Field>
-                  <Field label="Color del texto">
+                  <Field label="Color del texto" className={activeTab === "prizes" ? undefined : "hidden"}>
                     <ColorField value={segment.text_color} onChange={(value) => updateSegment(segment.id, { text_color: value })} />
                   </Field>
                 </div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className={activeTab === "prizes" ? "mt-3 grid gap-3 md:grid-cols-2" : "hidden"}>
                   <Field label="Imagen del segmento" hint="Se muestra dentro de esta porción de la ruleta.">
                     <ImagePicker
                       label={`Imagen - ${segment.label || "segmento"}`}
@@ -642,7 +733,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                   </div>
                 </div>
 
-                <div className="mt-3">
+                <div className={activeTab === "probability" ? "mt-3" : "hidden"}>
                   <Advanced label="Stock / inventario">
                     <label className="flex items-center gap-2 text-sm font-semibold text-ink">
                       <Toggle checked={segment.stock_managed} onChange={(value) => updateSegment(segment.id, { stock_managed: value })} label="Controlar stock" />
@@ -667,6 +758,7 @@ export function RouletteEditor({ config }: { config: RouletteConfigView }) {
                     )}
                   </Advanced>
                 </div>
+                </> : null}
               </div>
             );
           })}

@@ -1,7 +1,7 @@
 import { getGames } from "@/lib/data/games";
 import { PageIntro } from "@/components/ui/PageIntro";
 import { SetupNotice } from "@/components/SetupNotice";
-import { GameEditorCard } from "@/components/games/GameEditorCard";
+import { GamesCatalog } from "@/components/games/GamesCatalog";
 
 export const dynamic = "force-dynamic";
 
@@ -18,16 +18,12 @@ export default async function JuegosPage() {
     <>
       <PageIntro
         title="Juegos"
-        description="Mostrá u ocultá cada juego en la pantalla principal y editá su portada y textos."
+        description="Estado general de las experiencias disponibles en el tótem. Entrá a cada juego para editar su contenido, diseño y reglas."
       />
       {error ? (
         <SetupNotice error={error} />
       ) : (
-        <div className="space-y-4">
-          {games.map((game) => (
-            <GameEditorCard key={game.id} game={game} />
-          ))}
-        </div>
+        <GamesCatalog games={games} />
       )}
     </>
   );

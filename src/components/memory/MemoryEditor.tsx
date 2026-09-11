@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { MemoryConfigView } from "@/lib/data/memory";
 import {
@@ -25,6 +25,7 @@ import { assetUrl } from "@/lib/supabase/publicStorage";
 import { sameJson } from "@/lib/realtime/compare";
 import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
 import type { Database } from "@/types/database.types";
+import { useGameWorkspace } from "@/components/games/GameWorkspace";
 
 type MemorySettingsRow = Database["public"]["Tables"]["memory_settings"]["Row"];
 type MemoryCardRow = Database["public"]["Tables"]["memory_card_faces"]["Row"];
@@ -99,6 +100,7 @@ async function fetchMemoryForm(): Promise<MemoryForm | null> {
 }
 
 export function MemoryEditor({ config }: { config: MemoryConfigView }) {
+  const { activeTab, updatePreview, updateEditorState } = useGameWorkspace();
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState(initialForm.time_limit_seconds);
@@ -106,6 +108,7 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
   const [backAssetId, setBackAssetId] = useState(initialForm.back_asset_id);
   const [backAssetUrl, setBackAssetUrl] = useState(initialForm.backAssetUrl);
   const [cards, setCards] = useState<CardForm[]>(initialForm.cards.map((card) => ({ ...card })));
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(initialForm.cards[0]?.id ?? null);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<MemoryForm | null>(null);
 
@@ -120,6 +123,33 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
     [backAssetId, backAssetUrl, cards, playerMode, timeLimitSeconds],
   );
   const isDirty = !sameJson(currentForm, baseline);
+  const isValid = useMemo(
+    () =>
+      memoryConfigSchema.safeParse({
+        time_limit_seconds: Number(timeLimitSeconds) || 0,
+        player_mode: playerMode,
+        back_asset_id: backAssetId,
+        cards: cards.map((card) => ({ id: card.id, asset_id: card.asset_id, active: card.active })),
+      }).success,
+    [backAssetId, cards, playerMode, timeLimitSeconds],
+  );
+
+  useEffect(() => {
+    updatePreview({
+      config: {
+        memory: {
+          timeLimitSeconds: Number(timeLimitSeconds) || 0,
+          playerMode,
+          backImageSrc: backAssetUrl,
+          faces: cards
+            .filter((card) => card.active)
+            .map((card) => ({ id: card.id, image: card.assetUrl ?? "", imageAlt: "Carta de Memory" })),
+        },
+      },
+    });
+  }, [backAssetUrl, cards, playerMode, timeLimitSeconds, updatePreview]);
+
+  useEffect(() => updateEditorState({ dirty: isDirty, valid: isValid }), [isDirty, isValid, updateEditorState]);
 
   const applyForm = useCallback((form: MemoryForm) => {
     setTimeLimitSeconds(form.time_limit_seconds);
@@ -238,10 +268,12 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
   }
 
   function addCard() {
+    const id = crypto.randomUUID();
+    setExpandedCardId(id);
     setCards((current) => [
       ...current,
       {
-        id: crypto.randomUUID(),
+        id,
         asset_id: null,
         assetUrl: null,
         active: true,
@@ -279,13 +311,15 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
     });
   }
 
+  if (activeTab !== "cards" && activeTab !== "rules") return null;
+
   return (
     <div className="space-y-5">
       {pendingRemote ? (
         <PendingRemoteChange onApply={() => applyForm(pendingRemote)} onDismiss={() => setPendingRemote(null)} />
       ) : null}
 
-      <Card>
+      {activeTab === "rules" ? <Card>
         <CardHeader
           title="Configuracion"
           description="Tiempo, modo de jugadores e imagenes disponibles para armar el tablero."
@@ -342,9 +376,9 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
             </div>
           </Field>
         </CardBody>
-      </Card>
+      </Card> : null}
 
-      <Card>
+      {activeTab === "cards" ? <Card>
         <CardHeader
           title="Cartas"
           description="Cada imagen representa un par. El totem duplica automaticamente cada carta."
@@ -357,35 +391,44 @@ export function MemoryEditor({ config }: { config: MemoryConfigView }) {
         <CardBody>
           {cards.length === 0 ? <p className="py-6 text-center text-sm text-muted">No hay cartas. Agrega la primera.</p> : null}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {cards.map((card, index) => (
-              <div key={card.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-3">
-                <DirectImageUpload
+              <div key={card.id} className="rounded-xl border border-panel-border bg-surface/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-semibold text-ink"
+                    onClick={() => setExpandedCardId((current) => current === card.id ? null : card.id)}
+                    aria-expanded={expandedCardId === card.id}
+                  >
+                    <ChevronDown size={16} className={expandedCardId === card.id ? "rotate-180" : undefined} />
+                    Carta {index + 1}
+                    <span className="truncate text-xs font-normal text-muted">{card.assetUrl ? "Imagen configurada" : "Sin imagen"}</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Toggle checked={card.active} onChange={(value) => updateCard(card.id, { active: value })} label="Activa" />
+                    <button
+                      type="button"
+                      onClick={() => setCards((current) => current.filter((item) => item.id !== card.id))}
+                      className="rounded-lg p-1.5 text-danger hover:bg-danger/10"
+                      aria-label="Eliminar carta"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+                {expandedCardId === card.id ? <div className="mt-3 border-t border-panel-border pt-3"><DirectImageUpload
                   label={`Carta ${index + 1}`}
                   value={card.asset_id}
                   valueUrl={card.assetUrl}
                   onChange={(id, url) => updateCard(card.id, { asset_id: id, assetUrl: url })}
                 />
-
-                <div className="mt-auto flex items-center justify-between gap-2 pt-1">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-ink">
-                    Activa
-                    <Toggle checked={card.active} onChange={(value) => updateCard(card.id, { active: value })} label="Activa" />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setCards((current) => current.filter((item) => item.id !== card.id))}
-                    className="rounded-lg p-1.5 text-danger hover:bg-danger/10"
-                    aria-label="Eliminar carta"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                </div> : null}
               </div>
             ))}
           </div>
         </CardBody>
-      </Card>
+      </Card> : null}
 
       <div className="sticky bottom-4 flex justify-end">
         <Button onClick={save} loading={isPending} className="shadow-soft">

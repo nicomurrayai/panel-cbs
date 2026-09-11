@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import type { GameEditView } from "@/lib/data/games";
@@ -49,6 +49,19 @@ type GameForm = {
   cover_asset_id: string | null;
   coverUrl: string | null;
   theme_config: GameThemeOverride;
+};
+
+export type GamePreviewDraft = {
+  id: string;
+  title: string;
+  description: string;
+  ctaLabel: string;
+  imageSrc: string;
+  visible: boolean;
+  enabled: boolean;
+  sortOrder: number;
+  accentColor: string | null;
+  themeOverride: GameThemeOverride;
 };
 
 function formFromView(game: GameEditView): GameForm {
@@ -102,7 +115,19 @@ async function fetchGameForm(id: string) {
   return data ? formFromRow(data) : null;
 }
 
-export function GameEditorCard({ game }: { game: GameEditView }) {
+export function GameEditorCard({
+  game,
+  section = "all",
+  onDraftChange,
+  onDirtyChange,
+  onValidationChange,
+}: {
+  game: GameEditView;
+  section?: "all" | "general" | "design";
+  onDraftChange?: (draft: GamePreviewDraft) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onValidationChange?: (valid: boolean) => void;
+}) {
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromView(game), [game]);
 
@@ -141,6 +166,43 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
     [accent, coverId, coverUrl, ctaLabel, description, enabled, mText, mTitle, maintenance, sortOrder, themeConfig, title, visible],
   );
   const isDirty = !sameJson(currentForm, baseline);
+  const previewDraft = useMemo<GamePreviewDraft>(
+    () => ({
+      id: game.id,
+      title,
+      description,
+      ctaLabel,
+      imageSrc: coverUrl ?? "",
+      visible,
+      enabled,
+      sortOrder: Number(sortOrder) || 0,
+      accentColor: accent || null,
+      themeOverride: themeConfig,
+    }),
+    [accent, coverUrl, ctaLabel, description, enabled, game.id, sortOrder, themeConfig, title, visible],
+  );
+  const isValid = useMemo(
+    () =>
+      gameUpdateSchema.safeParse({
+        title,
+        description,
+        cta_label: ctaLabel,
+        visible,
+        enabled,
+        sort_order: Number(sortOrder),
+        cover_asset_id: coverId,
+        accent_color: accent || null,
+        maintenance_mode: maintenance,
+        maintenance_title: maintenance ? mTitle : null,
+        maintenance_text: maintenance ? mText : null,
+        theme_config: themeConfig,
+      }).success,
+    [accent, coverId, ctaLabel, description, enabled, mText, mTitle, maintenance, sortOrder, themeConfig, title, visible],
+  );
+
+  useEffect(() => onDraftChange?.(previewDraft), [onDraftChange, previewDraft]);
+  useEffect(() => onDirtyChange?.(isDirty), [isDirty, onDirtyChange]);
+  useEffect(() => onValidationChange?.(isValid), [isValid, onValidationChange]);
 
   const applyForm = useCallback((form: GameForm) => {
     setTitle(form.title);
@@ -236,7 +298,7 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
           <PendingRemoteChange onApply={() => applyForm(pendingRemote)} onDismiss={() => setPendingRemote(null)} />
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {section !== "design" ? <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h3 className="text-lg font-bold text-ink">{gameLabel(game.id)}</h3>
             {visible ? (
@@ -253,9 +315,9 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
             Mostrar en la home
             <Toggle checked={visible} onChange={setVisible} label="Visible" />
           </label>
-        </div>
+        </div> : null}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {section !== "design" ? <><div className="grid gap-4 md:grid-cols-2">
           <Field label="Titulo" htmlFor={`title-${game.id}`} required>
             <Input id={`title-${game.id}`} value={title} onChange={(event) => setTitle(event.target.value)} />
           </Field>
@@ -279,8 +341,9 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
             }}
           />
         </Field>
+        </> : null}
 
-        <div className="rounded-2xl border border-panel-border bg-surface/40 p-4 space-y-4">
+        {section !== "general" ? <div className="space-y-4 rounded-xl border border-panel-border bg-surface/40 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-bold text-ink">Tema propio del juego</p>
@@ -354,15 +417,12 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
               </Field>
             </div>
           ) : null}
-        </div>
+        </div> : null}
 
-        <Advanced>
+        {section !== "design" ? <Advanced>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Orden en la home" htmlFor={`sort-${game.id}`} hint="Numero menor aparece primero.">
               <Input id={`sort-${game.id}`} type="number" min={0} value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} />
-            </Field>
-            <Field label="Color de acento">
-              <ColorField value={accent} onChange={setAccent} />
             </Field>
           </div>
 
@@ -385,7 +445,13 @@ export function GameEditorCard({ game }: { game: GameEditView }) {
               </Field>
             </div>
           )}
-        </Advanced>
+        </Advanced> : null}
+
+        {section !== "general" ? (
+          <Field label="Color de acento de la experiencia">
+            <ColorField value={accent} onChange={setAccent} />
+          </Field>
+        ) : null}
 
         <div className="flex justify-end">
           <Button onClick={save} loading={isPending}>

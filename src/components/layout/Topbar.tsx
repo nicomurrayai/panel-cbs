@@ -24,9 +24,9 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-panel-border bg-surface-strong/80 px-4 py-3 backdrop-blur lg:px-8">
-      <h1 className="text-base font-bold text-ink">{currentLabel(pathname)}</h1>
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-panel-border bg-white/90 px-4 backdrop-blur lg:px-10">
+      <h1 className="text-sm font-semibold text-ink">{currentLabel(pathname)}</h1>
+      <div className="flex items-center gap-3 md:hidden">
         <ConnectionStatus />
         <Button variant="secondary" size="sm" onClick={logout} loading={loading}>
           <LogOut size={15} />

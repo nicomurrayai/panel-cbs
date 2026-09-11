@@ -14,7 +14,7 @@ const statusConfig: Record<
   disconnected: { icon: WifiOff, text: "Reconectando Realtime", cls: "text-danger" },
 };
 
-export function ConnectionStatus() {
+export function ConnectionStatus({ compact = false }: { compact?: boolean }) {
   const status = useSupabaseRealtime({
     channelName: "panel-cbs-connection",
     tables: ["global_settings"],
@@ -25,13 +25,14 @@ export function ConnectionStatus() {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold",
+        "inline-flex items-center gap-1.5 text-xs font-medium",
+        !compact && "rounded-full border border-panel-border bg-white px-2.5 py-1",
         config.cls,
       )}
       title="Estado de Supabase Realtime"
     >
       <Icon size={14} className={config.spin ? "animate-spin" : undefined} />
-      {config.text}
+      {compact && status === "connected" ? "Sistema conectado" : config.text}
     </span>
   );
 }

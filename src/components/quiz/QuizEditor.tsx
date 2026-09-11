@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Plus, Save, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { QuizConfigView } from "@/lib/data/quiz";
 import { quizConfigSchema, type QuizQuestionType } from "@/lib/validation/quiz";
@@ -21,6 +21,7 @@ import { sameJson } from "@/lib/realtime/compare";
 import { fetchMediaAssetById, type MediaAssetRow } from "@/lib/realtime/mediaAssets";
 import { cn } from "@/lib/cn";
 import type { Database } from "@/types/database.types";
+import { useGameWorkspace } from "@/components/games/GameWorkspace";
 
 type QuizQuestionRow = Database["public"]["Tables"]["quiz_questions"]["Row"];
 
@@ -148,9 +149,11 @@ function modalityPatch(type: QuizQuestionType): Pick<QuestionForm, "type" | "cor
 }
 
 export function QuizEditor({ config }: { config: QuizConfigView }) {
+  const { activeTab, updatePreview, updateEditorState } = useGameWorkspace();
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
   const [questions, setQuestions] = useState<QuestionForm[]>(initialForm.questions);
+  const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(initialForm.questions[0]?.id ?? null);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<QuizForm | null>(null);
 
@@ -283,6 +286,42 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
     [questions],
   );
 
+  useEffect(() => {
+    updatePreview({
+      quizQuestions: questions
+        .filter((question) => question.active)
+        .map((question) =>
+          question.type === "multiple_choice"
+            ? {
+                id: question.id,
+                question: question.question,
+                image: question.imageUrl ?? "",
+                imageAlt: question.image_alt,
+                type: question.type,
+                options: question.options ?? EMPTY_OPTIONS,
+                correctIndex: question.correct_option_index ?? 0,
+                active: question.active,
+                sortOrder: question.sort_order,
+              }
+            : {
+                id: question.id,
+                question: question.question,
+                image: question.imageUrl ?? "",
+                imageAlt: question.image_alt,
+                type: question.type,
+                answer: question.correct,
+                active: question.active,
+                sortOrder: question.sort_order,
+              },
+        ),
+    });
+  }, [questions, updatePreview]);
+
+  useEffect(
+    () => updateEditorState({ dirty: isDirty, valid: validation.success }),
+    [isDirty, updateEditorState, validation.success],
+  );
+
   function save() {
     const parsed = quizConfigSchema.safeParse(buildInput());
     if (!parsed.success) {
@@ -298,6 +337,8 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
       },
     });
   }
+
+  if (activeTab !== "questions") return null;
 
   return (
     <div className="space-y-5">
@@ -334,7 +375,11 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setQuestions((current) => [...current, createEmptyQuestion(current.length)])}
+              onClick={() => {
+                const question = createEmptyQuestion(questions.length);
+                setQuestions((current) => [...current, question]);
+                setExpandedQuestionId(question.id);
+              }}
             >
               <Plus size={15} /> Agregar pregunta
             </Button>
@@ -343,11 +388,20 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
         <CardBody>
           {questions.length === 0 ? <p className="py-6 text-center text-sm text-muted">No hay preguntas. Agrega la primera.</p> : null}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
             {questions.map((question, index) => (
-              <div key={question.id} className="flex flex-col gap-3 rounded-2xl border border-panel-border bg-surface/30 p-4">
+              <div key={question.id} className="flex flex-col gap-3 rounded-xl border border-panel-border bg-surface/30 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-muted">#{index + 1}</span>
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-semibold text-ink"
+                    onClick={() => setExpandedQuestionId((current) => current === question.id ? null : question.id)}
+                    aria-expanded={expandedQuestionId === question.id}
+                  >
+                    <ChevronDown size={16} className={expandedQuestionId === question.id ? "rotate-180" : undefined} />
+                    <span>Pregunta {index + 1}</span>
+                    <span className="truncate text-xs font-normal text-muted">{question.question || "Sin enunciado"}</span>
+                  </button>
                   <div className="flex items-center gap-2">
                     <label className="flex items-center gap-1.5 text-xs font-semibold text-ink">
                       Activa
@@ -364,7 +418,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                   </div>
                 </div>
 
-                <Field label="Modalidad">
+                {expandedQuestionId === question.id ? <><Field label="Modalidad">
                   <div className="flex gap-2">
                     {(
                       [
@@ -475,6 +529,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
                     </div>
                   </Field>
                 )}
+                </> : null}
               </div>
             ))}
           </div>

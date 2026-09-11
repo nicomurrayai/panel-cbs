@@ -17,8 +17,8 @@ export default async function MediosPage() {
   return (
     <>
       <PageIntro
-        title="Medios"
-        description="Subí, reemplazá y eliminá las imágenes del bucket game-assets."
+        title="Recursos"
+        description="Biblioteca visual compartida por el tótem. Subí, reemplazá o eliminá imágenes sin salir del editor."
       />
       {error ? <SetupNotice error={error} /> : <MediaLibrary assets={assets} />}
     </>
