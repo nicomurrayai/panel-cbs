@@ -11,10 +11,14 @@ export async function saveQuizConfig(input: unknown): Promise<ActionResult> {
     return fail(parsed.error.issues[0]?.message ?? "Configuracion invalida.");
   }
 
-  const { questions } = parsed.data;
+  const { questions, time_limit_seconds, show_correct_answer } = parsed.data;
   const supabase = getAdminClient();
 
   try {
+    const { data: game, error: gameError } = await supabase.from("games").select("config").eq("id", "quiz").single();
+    if (gameError) throw gameError;
+    const existingConfig = game.config && typeof game.config === "object" && !Array.isArray(game.config) ? game.config : {};
+
     const { data: existingQuestions, error: existingQuestionsError } = await supabase
       .from("quiz_questions")
       .select("id")
@@ -56,6 +60,11 @@ export async function saveQuizConfig(input: unknown): Promise<ActionResult> {
         throw error;
       }
     }
+
+    const { error: settingsError } = await supabase.from("games").update({
+      config: { ...existingConfig, time_limit_seconds, show_correct_answer },
+    }).eq("id", "quiz");
+    if (settingsError) throw settingsError;
 
     revalidatePath("/quiz");
     revalidatePath("/");

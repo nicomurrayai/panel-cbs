@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Plus, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { quizSettingsFromConfig } from "@/lib/quizSettings";
 import type { QuizConfigView } from "@/lib/data/quiz";
 import { quizConfigSchema, type QuizQuestionType } from "@/lib/validation/quiz";
 import { saveQuizConfig } from "@/actions/quiz";
@@ -40,6 +41,8 @@ type QuestionForm = {
 };
 
 type QuizForm = {
+  time_limit_seconds: string;
+  show_correct_answer: boolean;
   questions: QuestionForm[];
 };
 
@@ -87,6 +90,8 @@ function sortQuestions(questions: QuestionForm[]) {
 
 function formFromConfig(config: QuizConfigView): QuizForm {
   return {
+    time_limit_seconds: String(config.time_limit_seconds),
+    show_correct_answer: config.show_correct_answer,
     questions: config.questions.map((question, index) => ({ ...question, sort_order: index })),
   };
 }
@@ -127,7 +132,10 @@ async function fetchQuizForm(): Promise<QuizForm | null> {
   }
 
   const questions = await Promise.all(((data ?? []) as QuizQuestionRow[]).map(questionFromRow));
-  return { questions: sortQuestions(questions) };
+  const { data: game, error: gameError } = await supabase.from("games").select("config").eq("id", "quiz").single();
+  if (gameError) throw gameError;
+  const settings = quizSettingsFromConfig(game.config);
+  return { ...settings, time_limit_seconds: String(settings.time_limit_seconds), questions: sortQuestions(questions) };
 }
 
 function modalityPatch(type: QuizQuestionType): Pick<QuestionForm, "type" | "correct" | "options" | "correct_option_index"> {
@@ -152,16 +160,20 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
   const { activeTab, updatePreview, updateEditorState } = useGameWorkspace();
   const { run, isPending } = useAsyncAction();
   const initialForm = useMemo(() => formFromConfig(config), [config]);
+  const [timeLimit, setTimeLimit] = useState(initialForm.time_limit_seconds);
+  const [showCorrectAnswer, setShowCorrectAnswer] = useState(initialForm.show_correct_answer);
   const [questions, setQuestions] = useState<QuestionForm[]>(initialForm.questions);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(initialForm.questions[0]?.id ?? null);
   const [baseline, setBaseline] = useState(initialForm);
   const [pendingRemote, setPendingRemote] = useState<QuizForm | null>(null);
 
-  const currentForm = useMemo<QuizForm>(() => ({ questions }), [questions]);
+  const currentForm = useMemo<QuizForm>(() => ({ questions, time_limit_seconds: timeLimit, show_correct_answer: showCorrectAnswer }), [questions, timeLimit, showCorrectAnswer]);
   const isDirty = !sameJson(currentForm, baseline);
 
   const applyForm = useCallback((form: QuizForm) => {
     setQuestions(sortQuestions(form.questions).map((question) => ({ ...question })));
+    setTimeLimit(form.time_limit_seconds);
+    setShowCorrectAnswer(form.show_correct_answer);
     setBaseline(form);
     setPendingRemote(null);
   }, []);
@@ -189,13 +201,17 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
 
   useSupabaseRealtime({
     channelName: "panel-cbs-quiz",
-    tables: ["quiz_questions", "media_assets"],
+    tables: ["quiz_questions", "media_assets", "games"],
     onChange: (table, payload) => {
       if (isDirty) {
         void queueRemoteSnapshot();
         return;
       }
 
+      if (table === "games") {
+        void fetchQuizForm().then((form) => { if (form) handleRemoteForm(form); });
+        return;
+      }
       if (table === "quiz_questions") {
         const quizPayload = payload as RealtimePayload<QuizQuestionRow>;
         const row = (quizPayload.eventType === "DELETE" ? quizPayload.old : quizPayload.new) as Partial<QuizQuestionRow>;
@@ -204,12 +220,13 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
         }
 
         if (quizPayload.eventType === "DELETE") {
-          applyForm({ questions: currentForm.questions.filter((question) => question.id !== row.id) });
+          applyForm({ ...currentForm, questions: currentForm.questions.filter((question) => question.id !== row.id) });
           return;
         }
 
         void questionFromRow(quizPayload.new as QuizQuestionRow).then((nextQuestion) => {
           applyForm({
+            ...currentForm,
             questions: sortQuestions([
               nextQuestion,
               ...currentForm.questions.filter((question) => question.id !== nextQuestion.id),
@@ -230,7 +247,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
           ? { ...question, imageUrl: mediaPayload.eventType === "DELETE" ? null : assetUrl(mediaPayload.new as MediaAssetRow) }
           : question,
       );
-      applyForm({ questions: nextQuestions });
+      applyForm({ ...currentForm, questions: nextQuestions });
     },
     onReconnect: async () => {
       const form = await fetchQuizForm();
@@ -266,6 +283,8 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
 
   function buildInput() {
     return {
+      time_limit_seconds: Number(timeLimit),
+      show_correct_answer: showCorrectAnswer,
       questions: questions.map((question) => ({
         id: question.id,
         question: question.question,
@@ -283,11 +302,12 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
   const validation = useMemo(
     () => quizConfigSchema.safeParse(buildInput()),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [questions],
+    [questions, timeLimit, showCorrectAnswer],
   );
 
   useEffect(() => {
     updatePreview({
+      config: { quiz: { timeLimitSeconds: Number(timeLimit) || 60, showCorrectAnswer } },
       quizQuestions: questions
         .filter((question) => question.active)
         .map((question) =>
@@ -315,7 +335,7 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
               },
         ),
     });
-  }, [questions, updatePreview]);
+  }, [questions, timeLimit, showCorrectAnswer, updatePreview]);
 
   useEffect(
     () => updateEditorState({ dirty: isDirty, valid: validation.success }),
@@ -364,6 +384,18 @@ export function QuizEditor({ config }: { config: QuizConfigView }) {
           <div className="text-sm text-muted">
             {questions.filter((question) => question.active).length} preguntas activas de {questions.length}
           </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Configuración del quiz" description="Ajusta el tiempo por pregunta y cómo se muestra la corrección." />
+        <CardBody className="space-y-4">
+          <Field htmlFor="quiz-time-limit" label="Tiempo por pregunta (segundos)" hint="Entre 10 y 600 segundos. Al agotarse, avanza sin sumar un acierto.">
+            <Input id="quiz-time-limit" type="number" min={10} max={600} step={1} value={timeLimit} onChange={(event) => setTimeLimit(event.target.value)} />
+          </Field>
+          <Field label="Mostrar respuesta correcta" hint="Revela la respuesta correcta después de responder o al agotarse el tiempo.">
+            <Toggle checked={showCorrectAnswer} onChange={setShowCorrectAnswer} label="Mostrar respuesta correcta" />
+          </Field>
         </CardBody>
       </Card>
 

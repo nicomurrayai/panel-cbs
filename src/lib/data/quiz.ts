@@ -1,4 +1,5 @@
 import "server-only";
+import { quizSettingsFromConfig } from "@/lib/quizSettings";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { assetUrl } from "@/lib/supabase/storage";
 import { one } from "@/lib/embed";
@@ -18,6 +19,8 @@ export type QuizQuestionView = {
 };
 
 export type QuizConfigView = {
+  time_limit_seconds: number;
+  show_correct_answer: boolean;
   questions: QuizQuestionView[];
 };
 
@@ -56,7 +59,11 @@ export async function getQuizConfig(): Promise<QuizConfigView> {
     throw error;
   }
 
+  const { data: game, error: gameError } = await supabase.from("games").select("config").eq("id", "quiz").single();
+  if (gameError) throw gameError;
+
   return {
+    ...quizSettingsFromConfig(game.config),
     questions: (data ?? []).map((row) => {
       const image = one(
         (row as { image: Parameters<typeof assetUrl>[0] | Parameters<typeof assetUrl>[0][] }).image,

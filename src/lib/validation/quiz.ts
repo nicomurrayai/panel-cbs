@@ -37,6 +37,8 @@ export const quizQuestionSchema = z
 
 export const quizConfigSchema = z
   .object({
+    time_limit_seconds: z.coerce.number().int().min(10).max(600),
+    show_correct_answer: z.boolean(),
     questions: z.array(quizQuestionSchema),
   })
   .superRefine((val, ctx) => {
